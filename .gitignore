@@ -1,0 +1,27 @@
+# ─── KİŞİSEL VERİ — ASLA COMMIT'LEME ────────────────────────────
+# Bu dosyalar kullanıcının pano geçmişini içerir.
+archive.json
+settings.json
+session_backup.json
+recovery_pending.json
+data.json
+data.json.*
+*.log
+*.pid
+
+# ─── Python ─────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# ─── Geliştirme / test artıkları ────────────────────────────────
+.playwright-mcp/
+copytracker-*.png
+*.tmp
+
+# ─── İşletim sistemi ────────────────────────────────────────────
+Thumbs.db
+Desktop.ini
+.DS_Store

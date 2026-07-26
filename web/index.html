@@ -1,0 +1,977 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CopyTracker — Kopyalananlar</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0b0d13; --side:#0e1119; --panel:#131722; --panel2:#0f131c; --line:#232a3a;
+  --text:#e8ebf2; --muted:#8b94a8; --accent:#6c8cff; --green:#34d399; --red:#f87171;
+  --amber:#fbbf24;
+}
+html,body{background:var(--bg);color:var(--text);font-family:"Segoe UI",system-ui,-apple-system,sans-serif;min-height:100vh}
+a{color:var(--accent)}
+button{font-family:inherit}
+select,input{font-family:inherit}
+
+.app{display:grid;grid-template-columns:260px 1fr;min-height:100vh}
+
+/* ---------------- kenar çubuğu ---------------- */
+aside{background:var(--side);border-right:1px solid var(--line);padding:20px 14px;position:sticky;top:0;height:100vh;overflow-y:auto;display:flex;flex-direction:column;gap:20px}
+.brand{font-size:19px;font-weight:700;letter-spacing:.3px;padding:0 6px}
+.brand .logo{margin-right:7px}
+aside h3{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted);margin:0 6px 8px}
+
+.fbtn{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:transparent;border:1px solid transparent;border-radius:9px;padding:7px 10px;color:var(--muted);font-size:13px;cursor:pointer;transition:.15s;margin-bottom:2px}
+.fbtn:hover{background:var(--panel);color:var(--text)}
+.fbtn.active{background:var(--panel);border-color:var(--line);color:var(--text);font-weight:600}
+.fbtn .dot{width:7px;height:7px;border-radius:50%;background:var(--line);flex:none;transition:.15s}
+.fbtn.active .dot{background:var(--green)}
+.fdesc{font-size:11px;color:var(--muted);padding:5px 8px 0;line-height:1.45}
+.domrow{display:none;gap:6px;margin-top:6px;padding:0 2px}
+.domrow.show{display:flex}
+.domrow input{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 10px;color:var(--text);font-size:12px;outline:none}
+.domrow input:focus{border-color:var(--accent)}
+.domrow button{background:var(--panel);border:1px solid var(--line);border-radius:8px;color:var(--muted);padding:0 10px;font-size:12px;cursor:pointer}
+.domrow button:hover{color:var(--green);border-color:var(--green)}
+
+.colrow{display:flex;align-items:center;gap:8px;border:1px solid transparent;border-radius:9px;padding:8px 10px;cursor:pointer;transition:.15s}
+.colrow:hover{background:var(--panel)}
+.colrow.active{background:var(--panel);border-color:var(--line)}
+.colrow .cname{flex:1;font-size:13.5px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.colrow .ccount{font-size:11px;color:var(--muted);background:var(--panel2);border:1px solid var(--line);border-radius:99px;padding:1px 8px}
+.colrow.active .ccount{color:var(--accent)}
+.colrow .live{font-size:9.5px;font-weight:700;letter-spacing:.6px;color:var(--green)}
+.colrow .cdel{background:none;border:none;color:var(--muted);font-size:13px;cursor:pointer;padding:0 2px;border-radius:5px;opacity:0;transition:.15s}
+.colrow:hover .cdel{opacity:1}
+.colrow .cdel:hover{color:var(--red)}
+.colrow .cdel.armed{color:#fff;background:var(--red);opacity:1;padding:0 6px}
+ul.plain{list-style:none;display:flex;flex-direction:column;gap:2px}
+
+.newcol{display:flex;gap:6px;margin-top:8px;padding:0 2px}
+.newcol input{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:7px 10px;color:var(--text);font-size:12.5px;outline:none}
+.newcol input:focus{border-color:var(--accent)}
+.newcol button{background:var(--panel);border:1px solid var(--line);border-radius:8px;color:var(--muted);padding:0 11px;font-size:16px;cursor:pointer;transition:.15s}
+.newcol button:hover{color:var(--green);border-color:var(--green)}
+
+.settings label{display:block;font-size:11.5px;color:var(--muted);margin:0 6px 5px}
+.settings select{width:100%;background:var(--panel);border:1px solid var(--line);border-radius:8px;color:var(--text);padding:7px 10px;font-size:12.5px;outline:none}
+.shortcuts{font-size:10.5px;color:var(--muted);line-height:1.8;padding:0 6px}
+.shortcuts b{color:var(--text);font-weight:600;background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:0 5px}
+
+.sideinfo{margin-top:auto;font-size:11px;color:var(--muted);padding:0 6px;line-height:1.7}
+.sideinfo code{color:var(--muted)}
+
+/* ---------------- içerik ---------------- */
+main{padding:22px 26px 110px;max-width:920px;width:100%}
+.tophead{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+.tophead h1{font-size:21px;font-weight:600;display:flex;align-items:center;gap:10px}
+.capbadge{font-size:10px;font-weight:700;letter-spacing:.6px;color:var(--green);border:1px solid rgba(52,211,153,.4);background:rgba(52,211,153,.08);border-radius:99px;padding:3px 9px}
+
+.switch{display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;background:var(--panel);border:1px solid var(--line);border-radius:99px;padding:5px 12px 5px 6px}
+.switch .track{width:34px;height:19px;border-radius:99px;background:var(--line);position:relative;transition:.2s}
+.switch .track::after{content:"";position:absolute;top:2px;left:2px;width:15px;height:15px;border-radius:50%;background:#fff;transition:.2s}
+.switch.on .track{background:var(--green)}
+.switch.on .track::after{left:17px}
+.switch .lbl{font-size:12.5px;color:var(--muted)}
+.switch.on .lbl{color:var(--text)}
+body.paused main{--pauseline:1}
+#pausedBanner{display:none;background:#3a2f14;border:1px solid #6b5518;color:#ffe08a;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:13.5px}
+body.paused #pausedBanner{display:block}
+
+.stats{display:flex;gap:8px;margin-left:auto;flex-wrap:wrap}
+.chip{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:4px 12px;font-size:12.5px;color:var(--muted)}
+.chip b{color:var(--text);font-weight:600}
+.chip.green b{color:var(--green)}
+.chip.blue b{color:var(--accent)}
+
+.toolrow{display:flex;align-items:center;gap:8px;margin:12px 0 4px;flex-wrap:wrap}
+#search{flex:1;min-width:180px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:9px 14px;color:var(--text);font-size:13.5px;outline:none;transition:.15s}
+#search:focus{border-color:var(--accent)}
+.tbtn{background:var(--panel);border:1px solid var(--line);color:var(--muted);border-radius:9px;padding:8px 13px;font-size:12.5px;cursor:pointer;transition:.15s;white-space:nowrap}
+.tbtn:hover{color:var(--text);border-color:var(--muted)}
+.tbtn.armed{background:var(--red);border-color:var(--red);color:#fff}
+.tbtn.primary{color:var(--text)}
+
+.vchips{display:flex;gap:6px;margin:10px 0 2px;flex-wrap:wrap}
+.vchip{background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:99px;padding:4px 13px;font-size:12px;cursor:pointer;transition:.15s}
+.vchip:hover{color:var(--text)}
+.vchip.active{background:rgba(108,140,255,.13);border-color:var(--accent);color:var(--accent);font-weight:600}
+
+.progress{margin:12px 0 20px;height:5px;background:var(--panel);border-radius:99px;overflow:hidden}
+.progress i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--green));border-radius:99px;transition:width .4s ease}
+
+#offline{display:none;background:#3a1d22;border:1px solid #6b2a33;color:#ffb4bd;border-radius:10px;padding:10px 14px;margin-bottom:16px;font-size:13.5px}
+body.offline #offline{display:block}
+#recoveryBanner{display:none;background:#14263a;border:1px solid #1e4a6b;color:#8ecbff;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:13.5px;align-items:center;gap:10px;flex-wrap:wrap}
+#recoveryBanner.show{display:flex}
+#recoveryBanner button{background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:5px 12px;font-size:12px;cursor:pointer}
+#recoveryBanner button:hover{border-color:var(--accent)}
+
+/* seçim çubuğu */
+#bulkbar{display:none;position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--panel);border:1px solid var(--accent);border-radius:14px;padding:10px 16px;z-index:60;box-shadow:0 8px 30px rgba(0,0,0,.5);align-items:center;gap:10px}
+#bulkbar.show{display:flex}
+#bulkbar .bcount{font-size:13px;color:var(--accent);font-weight:600;margin-right:4px}
+#bulkbar button{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:9px;padding:7px 13px;font-size:12.5px;cursor:pointer;transition:.15s}
+#bulkbar button:hover{border-color:var(--accent)}
+#bulkbar button.danger:hover{border-color:var(--red);color:var(--red)}
+
+section{margin-bottom:30px}
+section>h2{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted);margin-bottom:12px;display:flex;align-items:center;gap:10px}
+section>h2 .cnt{color:var(--accent)}
+section>h2 .h2btn{margin-left:auto;background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:8px;padding:4px 11px;font-size:11.5px;cursor:pointer;text-transform:none;letter-spacing:0}
+section>h2 .h2btn:hover{color:var(--text);border-color:var(--muted)}
+.daylabel{display:flex;align-items:center;gap:10px;font-size:11.5px;font-weight:600;color:var(--muted);letter-spacing:.6px;margin:16px 0 8px}
+.daylabel::after{content:"";flex:1;height:1px;background:var(--line)}
+ul.cards{list-style:none;display:flex;flex-direction:column;gap:8px}
+
+.card{display:flex;align-items:flex-start;gap:11px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;animation:pop .22s ease}
+@keyframes pop{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+.card:hover{border-color:#31405c}
+.card.pinned{border-color:rgba(251,191,36,.35)}
+.card.selected{border-color:var(--accent);background:rgba(108,140,255,.07)}
+
+.selbox{flex:none;width:18px;height:18px;margin-top:5px;border-radius:5px;border:2px solid var(--muted);background:transparent;cursor:pointer;display:none;color:transparent;font-size:11px;line-height:1}
+body.selecting .selbox{display:block}
+.card.selected .selbox{background:var(--accent);border-color:var(--accent);color:#fff}
+body.selecting .check{display:none}
+
+.check{flex:none;width:26px;height:26px;margin-top:1px;border-radius:50%;border:2px solid var(--muted);background:transparent;color:transparent;font-size:14px;line-height:1;cursor:pointer;transition:.15s}
+.check:hover{border-color:var(--green);color:var(--green)}
+.card.done .check{background:var(--green);border-color:var(--green);color:#0b0d13;font-weight:700}
+
+.body{flex:1;min-width:0}
+.linkline{display:flex;align-items:flex-start;gap:8px;min-width:0}
+.linkline .fav{width:16px;height:16px;border-radius:4px;flex:none;margin-top:2px}
+.body a{font-size:14.5px;word-break:break-word;text-decoration:none;display:block}
+.body a:hover{text-decoration:underline}
+.body .suburl{font-size:11px;color:var(--muted);word-break:break-all;margin-top:2px;display:block}
+.body p{font-size:14px;white-space:pre-wrap;word-break:break-word;display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical;overflow:hidden}
+.body.clickable{cursor:pointer}
+.meta{margin-top:6px;font-size:11.5px;color:var(--muted);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.badge{background:rgba(108,140,255,.13);color:var(--accent);border-radius:5px;padding:1px 7px;font-size:10.5px;font-weight:600;letter-spacing:.5px}
+.badge.hostchip{background:var(--panel2);border:1px solid var(--line);color:var(--muted);letter-spacing:0}
+.badge.insta{background:linear-gradient(135deg,rgba(245,133,41,.18),rgba(221,42,123,.18),rgba(129,52,175,.18));color:#e18ab1}
+.badge.copies{background:rgba(251,191,36,.13);color:var(--amber)}
+
+.actions{flex:none;display:flex;gap:2px;margin-top:1px}
+.icobtn{background:transparent;border:1px solid transparent;border-radius:7px;color:var(--muted);font-size:13px;cursor:pointer;padding:3px 6px;transition:.15s}
+.icobtn:hover{border-color:var(--line);color:var(--text)}
+.icobtn.ok{color:var(--green)}
+.icobtn.pin-on{color:var(--amber)}
+.icobtn.danger:hover{color:var(--red);border-color:var(--red)}
+
+.card.done{opacity:.55;background:var(--panel2)}
+.card.done .body p,.card.done .body a{text-decoration:line-through}
+
+.empty{border:1px dashed var(--line);border-radius:12px;padding:26px;text-align:center;color:var(--muted);font-size:14px;line-height:1.7}
+.archnote{font-size:12px;color:var(--muted);background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;margin-bottom:14px}
+
+/* QR modal */
+#qrModal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:80;align-items:center;justify-content:center}
+#qrModal.show{display:flex}
+#qrModal .qrbox{background:#fff;border-radius:16px;padding:18px;text-align:center}
+#qrModal img{width:240px;height:240px;display:block}
+#qrModal .qurl{font-size:11px;color:#333;max-width:240px;word-break:break-all;margin-top:8px}
+
+/* mini toast */
+#miniToast{position:fixed;bottom:18px;right:18px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 16px;font-size:13px;color:var(--text);z-index:90;opacity:0;transform:translateY(8px);transition:.25s;pointer-events:none}
+#miniToast.show{opacity:1;transform:none}
+#miniToast.err{border-color:var(--red);color:#ffb4bd}
+
+@media (max-width:860px){
+  .app{grid-template-columns:1fr}
+  aside{position:static;height:auto;border-right:none;border-bottom:1px solid var(--line)}
+  main{padding:18px 14px 110px}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <div class="brand"><span class="logo">📋</span>CopyTracker</div>
+
+    <nav>
+      <h3>Yakalama Filtresi</h3>
+      <button class="fbtn" data-mode="all"><span class="dot"></span>Tümü</button>
+      <button class="fbtn" data-mode="links"><span class="dot"></span>🔗 Sadece linkler</button>
+      <button class="fbtn" data-mode="instagram"><span class="dot"></span>📷 Sadece Instagram</button>
+      <button class="fbtn" data-mode="custom"><span class="dot"></span>🎯 Özel alan adları</button>
+      <div class="domrow" id="domRow">
+        <input id="domInput" placeholder="youtube.com, x.com…">
+        <button id="domSave">Kaydet</button>
+      </div>
+      <div class="fdesc" id="fdesc"></div>
+    </nav>
+
+    <nav>
+      <h3>Koleksiyonlar</h3>
+      <ul class="plain" id="colList"></ul>
+      <div class="newcol">
+        <input id="newColName" maxlength="40" placeholder="Yeni koleksiyon…">
+        <button id="newColBtn" title="Koleksiyon oluştur">+</button>
+      </div>
+      <ul class="plain" style="margin-top:10px">
+        <li><div class="colrow" id="archiveNav">
+          <span class="cname">🗄 Arşiv</span>
+          <span class="ccount" id="archCount">0</span>
+        </div></li>
+      </ul>
+    </nav>
+
+    <nav class="settings">
+      <h3>⚙ Ayarlar</h3>
+      <label for="retention">Arşiv saklama süresi (dolunca otomatik silinir)</label>
+      <select id="retention">
+        <option value="1h">1 saat</option>
+        <option value="1d">1 gün</option>
+        <option value="eod">Gün sonu (her gece boşalır)</option>
+        <option value="1m">1 ay (varsayılan)</option>
+        <option value="forever">Sonsuz</option>
+      </select>
+      <div class="shortcuts" style="margin-top:12px">
+        <b>Ctrl+Alt+K</b> yakalama aç/kapat<br>
+        <b>Ctrl+Alt+L</b> listeyi aç
+      </div>
+    </nav>
+
+    <div class="sideinfo">
+      <div id="started"></div>
+      <div>Aktif liste RAM'de · arşiv <code>archive.json</code></div>
+    </div>
+  </aside>
+
+  <main>
+    <div class="tophead">
+      <h1><span id="viewTitle"></span><span class="capbadge" id="capBadge">● KAYIT BURAYA</span></h1>
+      <div class="switch" id="capSwitch" title="Yakalamayı aç/kapat (Ctrl+Alt+K)">
+        <span class="track"></span><span class="lbl" id="capLbl">Yakalama</span>
+      </div>
+      <div class="stats" id="statChips">
+        <span class="chip blue">Bekleyen <b id="cntPending">0</b></span>
+        <span class="chip green">Tamamlanan <b id="cntDone">0</b></span>
+        <span class="chip">Toplam <b id="cntTotal">0</b></span>
+      </div>
+    </div>
+
+    <div id="pausedBanner">⏸ Yakalama kapalı — kopyaladıkların şu an kaydedilmiyor. Şalterle ya da Ctrl+Alt+K ile aç.</div>
+    <div id="recoveryBanner">💾 <span id="recText"></span>
+      <button id="recRestore">Geri Yükle</button>
+      <button id="recDiscard">Yoksay</button>
+    </div>
+
+    <div class="toolrow" id="toolRow">
+      <input id="search" type="search" placeholder="Bu görünümde ara…">
+      <button class="tbtn primary" id="copyListBtn" title="Görünen bekleyenleri panoya kopyala">⧉ Listeyi kopyala</button>
+      <button class="tbtn primary" id="downloadBtn" title=".txt olarak indir">⬇ İndir</button>
+      <button class="tbtn" id="selectBtn">☑ Seç</button>
+      <button class="tbtn" id="clearBtn" title="Bu koleksiyonu temizle (📌 sabitler kalır)">Temizle</button>
+    </div>
+
+    <div class="vchips" id="vchips">
+      <button class="vchip" data-v="all">Tümü</button>
+      <button class="vchip" data-v="links">🔗 Linkler</button>
+      <button class="vchip" data-v="instagram">📷 Instagram</button>
+      <button class="vchip" data-v="texts">📝 Metinler</button>
+    </div>
+
+    <div class="progress" id="progressWrap"><i id="bar"></i></div>
+
+    <div id="offline">⚠️ Uygulamaya ulaşılamıyor — CopyTracker kapalı görünüyor. <code>start.bat</code> ile yeniden başlatın.</div>
+
+    <div id="listView">
+      <section>
+        <h2>Bekleyenler <span class="cnt" id="cntP2"></span></h2>
+        <div id="pendingArea"></div>
+        <div class="empty" id="emptyPending"></div>
+      </section>
+
+      <section id="doneSection" style="display:none">
+        <h2>Tamamlananlar <span class="cnt" id="cntD2"></span>
+          <button class="h2btn" id="archiveDoneBtn">🗄 Tamamlananları arşivle</button>
+        </h2>
+        <div id="doneArea"></div>
+      </section>
+    </div>
+
+    <div id="archiveView" style="display:none">
+      <div class="archnote" id="archNote"></div>
+      <div id="archiveArea"></div>
+      <div class="empty" id="emptyArchive">Arşiv boş. Listeden 🗄 düğmesiyle öğe arşivleyebilirsin.</div>
+    </div>
+  </main>
+</div>
+
+<div id="bulkbar">
+  <span class="bcount" id="bulkCount"></span>
+  <button id="bulkCopy">⧉ Kopyala</button>
+  <button id="bulkArchive">🗄 Arşivle</button>
+  <button id="bulkDelete" class="danger">✕ Sil</button>
+  <button id="bulkCancel">Vazgeç</button>
+</div>
+
+<div id="qrModal"><div class="qrbox"><img id="qrImg" alt="QR"><div class="qurl" id="qrUrl"></div></div></div>
+<div id="miniToast"></div>
+
+<script>
+"use strict";
+const state = {
+  last: "", data: null, archive: null, query: "",
+  view: "list", viewFilter: "all",
+  selecting: false, selected: new Set()
+};
+const HDRS = {"Content-Type": "application/json", "X-CopyTracker": "1"};
+const FDESC = {
+  all: "Her kopyalanan şey kaydediliyor.",
+  links: "Sadece web sitesi linkleri kaydediliyor; düz metinler atlanıyor.",
+  instagram: "Sadece instagram.com linkleri kaydediliyor.",
+  custom: "Sadece aşağıdaki alan adlarının linkleri kaydediliyor."
+};
+const RETENTION_LABEL = {"1h":"1 saat","1d":"1 gün","eod":"gün sonu","1m":"1 ay","forever":"sonsuz"};
+
+function fmtTime(iso){ return iso ? iso.slice(11,16) : ""; }
+function fmtDT(iso){
+  if(!iso) return "";
+  const d = iso.slice(0,10).split("-");
+  return d[2] + "." + d[1] + "." + d[0] + " " + iso.slice(11,16);
+}
+function pad(n){ return String(n).padStart(2,"0"); }
+function dayKeyOf(date){ return date.getFullYear() + "-" + pad(date.getMonth()+1) + "-" + pad(date.getDate()); }
+function dayLabel(key){
+  if(!key) return "Tarihsiz";
+  const now = new Date();
+  if(key === dayKeyOf(now)) return "Bugün";
+  if(key === dayKeyOf(new Date(now.getTime() - 86400000))) return "Dün";
+  return key.split("-").reverse().join(".");
+}
+function hostOf(url){
+  try{ return new URL(url).hostname.replace(/^www\./,""); }catch(e){ return ""; }
+}
+function isInsta(url){
+  const h = hostOf(url || "");
+  return h === "instagram.com" || h.endsWith(".instagram.com");
+}
+function lc(s){ return String(s||"").toLocaleLowerCase("tr"); }
+
+let toastTimer = null;
+function miniToast(msg, isErr){
+  const t = document.getElementById("miniToast");
+  t.textContent = msg;
+  t.classList.toggle("err", !!isErr);
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function(){ t.classList.remove("show"); }, 2600);
+}
+
+async function post(path, body){
+  let out = {ok:false};
+  try{
+    const r = await fetch(path, {method:"POST", headers:HDRS, body:JSON.stringify(body||{})});
+    out = await r.json().catch(function(){ return {ok:r.ok}; });
+    if(!r.ok && out && out.error) miniToast(out.error, true);
+  }catch(e){
+    miniToast("Sunucuya ulaşılamadı", true);
+  }
+  state.last = "";
+  refresh();
+  return out;
+}
+function toggle(id, checked){ post("/api/toggle", {id:id, checked:checked}); }
+
+async function copyText(text){
+  try{
+    await fetch("/api/copied", {method:"POST", headers:HDRS, body:JSON.stringify({text:text})});
+    await navigator.clipboard.writeText(text);
+    return true;
+  }catch(e){
+    miniToast("Panoya yazılamadı", true);
+    return false;
+  }
+}
+
+/* ---------------- görünüm filtresi ---------------- */
+function matchesView(it){
+  const v = state.viewFilter;
+  if(v === "links") return !!it.is_link;
+  if(v === "instagram") return it.is_link && isInsta(it.url);
+  if(v === "texts") return !it.is_link;
+  return true;
+}
+function matchesQuery(it){
+  const q = lc(state.query.trim());
+  if(!q) return true;
+  return lc(it.text).includes(q) || lc(it.title).includes(q) || lc(it.url).includes(q);
+}
+
+/* ---------------- kart ---------------- */
+function card(it, isDone){
+  const li = document.createElement("li");
+  li.className = "card" + (isDone ? " done" : "") + (it.pinned ? " pinned" : "")
+    + (state.selected.has(it.id) ? " selected" : "");
+
+  const sel = document.createElement("button");
+  sel.className = "selbox";
+  sel.textContent = "✓";
+  sel.addEventListener("click", function(){
+    if(state.selected.has(it.id)) state.selected.delete(it.id); else state.selected.add(it.id);
+    renderFromCache();
+  });
+  li.appendChild(sel);
+
+  const cb = document.createElement("button");
+  cb.className = "check";
+  cb.title = isDone ? "Geri al" : "Tamamlandı olarak işaretle";
+  cb.textContent = "✓";
+  cb.addEventListener("click", function(){ toggle(it.id, !isDone); });
+  li.appendChild(cb);
+
+  const body = document.createElement("div");
+  body.className = "body";
+  const isSafeLink = it.is_link && /^https?:\/\//i.test(it.url || "");
+  if(isSafeLink){
+    const line = document.createElement("div");
+    line.className = "linkline";
+    const host = hostOf(it.url);
+    if(host){
+      const fav = document.createElement("img");
+      fav.className = "fav"; fav.alt = "";
+      fav.src = "https://icons.duckduckgo.com/ip3/" + encodeURIComponent(host) + ".ico";
+      fav.addEventListener("error", function(){ fav.remove(); });
+      line.appendChild(fav);
+    }
+    const wrap = document.createElement("div");
+    wrap.style.minWidth = "0";
+    const a = document.createElement("a");
+    a.href = it.url; a.target = "_blank"; a.rel = "noopener noreferrer";
+    a.textContent = (it.title || it.text).trim();
+    if(!isDone){
+      const markDone = function(){ setTimeout(function(){ toggle(it.id, true); }, 150); };
+      a.addEventListener("click", markDone);
+      a.addEventListener("auxclick", function(e){ if(e.button === 1) markDone(); });
+    }
+    wrap.appendChild(a);
+    if(it.title){
+      const su = document.createElement("span");
+      su.className = "suburl";
+      su.textContent = it.text.trim();
+      wrap.appendChild(su);
+    }
+    line.appendChild(wrap);
+    body.appendChild(line);
+  }else{
+    const p = document.createElement("p");
+    p.textContent = it.text;
+    body.appendChild(p);
+    if(!isDone){
+      body.classList.add("clickable");
+      body.title = "Tamamlandı olarak işaretlemek için tıkla";
+      body.addEventListener("click", function(){ toggle(it.id, true); });
+    }
+  }
+
+  const meta = document.createElement("div");
+  meta.className = "meta";
+  const info = document.createElement("span");
+  info.textContent = "#" + it.id + " · " + fmtTime(it.copied_at) +
+    (isDone && it.checked_at ? " → ✓ " + fmtTime(it.checked_at) : "");
+  meta.appendChild(info);
+  if(isSafeLink){
+    const hc = document.createElement("span");
+    hc.className = "badge hostchip" + (isInsta(it.url) ? " insta" : "");
+    hc.textContent = (isInsta(it.url) ? "📷 " : "") + hostOf(it.url);
+    meta.appendChild(hc);
+  }
+  if((it.copies || 1) > 1){
+    const c = document.createElement("span");
+    c.className = "badge copies";
+    c.textContent = "×" + it.copies;
+    c.title = "Bu içerik " + it.copies + " kez kopyalandı";
+    meta.appendChild(c);
+  }
+  body.appendChild(meta);
+  li.appendChild(body);
+
+  const actions = document.createElement("div");
+  actions.className = "actions";
+
+  const pin = document.createElement("button");
+  pin.className = "icobtn" + (it.pinned ? " pin-on" : "");
+  pin.title = it.pinned ? "Sabitlemeyi kaldır" : "Sabitle (Temizle'den etkilenmez)";
+  pin.textContent = "📌";
+  pin.addEventListener("click", function(){ post("/api/pin", {id:it.id, pinned:!it.pinned}); });
+  actions.appendChild(pin);
+
+  const cp = document.createElement("button");
+  cp.className = "icobtn"; cp.title = "Panoya kopyala"; cp.textContent = "⧉";
+  cp.addEventListener("click", async function(e){
+    e.stopPropagation();
+    if(await copyText(it.text)){
+      cp.textContent = "✓"; cp.classList.add("ok");
+      setTimeout(function(){ cp.textContent = "⧉"; cp.classList.remove("ok"); }, 1200);
+    }
+  });
+  actions.appendChild(cp);
+
+  if(isSafeLink && state.data && state.data.qr_available){
+    const qr = document.createElement("button");
+    qr.className = "icobtn"; qr.title = "QR kod (telefonda aç)"; qr.textContent = "▦";
+    qr.addEventListener("click", function(){ showQR(it); });
+    actions.appendChild(qr);
+  }
+
+  const ar = document.createElement("button");
+  ar.className = "icobtn"; ar.title = "Arşivle (diske taşı)"; ar.textContent = "🗄";
+  ar.addEventListener("click", function(){ post("/api/archive", {ids:[it.id]}); });
+  actions.appendChild(ar);
+
+  const del = document.createElement("button");
+  del.className = "icobtn danger"; del.title = "Sil"; del.textContent = "✕";
+  del.addEventListener("click", function(){ post("/api/delete", {ids:[it.id]}); });
+  actions.appendChild(del);
+
+  li.appendChild(actions);
+  return li;
+}
+
+function showQR(it){
+  const m = document.getElementById("qrModal");
+  document.getElementById("qrImg").src = "/api/qr?id=" + it.id + "&t=" + it.id;
+  document.getElementById("qrUrl").textContent = it.url;
+  m.classList.add("show");
+}
+document.getElementById("qrModal").addEventListener("click", function(){
+  this.classList.remove("show");
+});
+
+/* ---------------- gruplu çizim ---------------- */
+function renderGrouped(area, items, dateKey, isDone, pinnedFirst){
+  area.innerHTML = "";
+  let rest = items;
+  if(pinnedFirst){
+    const pinned = items.filter(function(i){ return i.pinned; });
+    rest = items.filter(function(i){ return !i.pinned; });
+    if(pinned.length){
+      const lbl = document.createElement("div");
+      lbl.className = "daylabel";
+      lbl.textContent = "📌 Sabitlenmiş";
+      area.appendChild(lbl);
+      const ul = document.createElement("ul"); ul.className = "cards";
+      pinned.forEach(function(it){ ul.appendChild(card(it, isDone)); });
+      area.appendChild(ul);
+    }
+  }
+  let curKey = null, curUl = null;
+  for(const it of rest){
+    const k = String(it[dateKey] || "").slice(0,10);
+    if(k !== curKey || !curUl){
+      curKey = k;
+      const lbl = document.createElement("div");
+      lbl.className = "daylabel";
+      lbl.textContent = dayLabel(k);
+      area.appendChild(lbl);
+      curUl = document.createElement("ul"); curUl.className = "cards";
+      area.appendChild(curUl);
+    }
+    curUl.appendChild(card(it, isDone));
+  }
+}
+
+/* ---------------- ana çizim ---------------- */
+function render(){
+  const d = state.data;
+  if(!d) return;
+  const items = d.items || [];
+  const cols = d.collections || [];
+  const active = d.active_collection;
+  const activeCol = cols.find(function(c){ return c.id === active; }) || {id:1, name:"Genel"};
+
+  document.body.classList.toggle("paused", !d.capture_enabled);
+  document.body.classList.toggle("selecting", state.selecting);
+  const sw = document.getElementById("capSwitch");
+  sw.classList.toggle("on", !!d.capture_enabled);
+  document.getElementById("capLbl").textContent = d.capture_enabled ? "Yakalama açık" : "Yakalama kapalı";
+
+  document.querySelectorAll(".fbtn").forEach(function(b){
+    b.classList.toggle("active", b.dataset.mode === d.filter_mode);
+  });
+  document.getElementById("fdesc").textContent = FDESC[d.filter_mode] || "";
+  document.getElementById("domRow").classList.toggle("show", d.filter_mode === "custom");
+  const di = document.getElementById("domInput");
+  if(document.activeElement !== di) di.value = (d.custom_domains || []).join(", ");
+
+  const rt = document.getElementById("retention");
+  if(document.activeElement !== rt) rt.value = d.retention || "1m";
+
+  document.querySelectorAll(".vchip").forEach(function(b){
+    b.classList.toggle("active", b.dataset.v === state.viewFilter);
+  });
+
+  // koleksiyonlar
+  const cl = document.getElementById("colList");
+  cl.innerHTML = "";
+  cols.forEach(function(c){
+    const li = document.createElement("li");
+    const row = document.createElement("div");
+    row.className = "colrow" + (c.id === active && state.view === "list" ? " active" : "");
+    row.addEventListener("click", function(){
+      state.view = "list";
+      if(c.id !== active) post("/api/collections/activate", {id:c.id});
+      else renderFromCache();
+    });
+    const nm = document.createElement("span");
+    nm.className = "cname";
+    nm.textContent = (c.id === 1 ? "📋 " : "📁 ") + c.name;
+    row.appendChild(nm);
+    const pend = items.filter(function(i){ return i.collection === c.id && !i.checked; }).length;
+    const cnt = document.createElement("span");
+    cnt.className = "ccount"; cnt.textContent = pend;
+    row.appendChild(cnt);
+    if(c.id === active){
+      const lv = document.createElement("span");
+      lv.className = "live"; lv.textContent = "● AKTİF";
+      row.appendChild(lv);
+    }
+    if(c.id !== 1){
+      const del = document.createElement("button");
+      del.className = "cdel"; del.title = "Koleksiyonu sil (öğeler Genel'e taşınır)"; del.textContent = "✕";
+      del.addEventListener("click", function(e){
+        e.stopPropagation();
+        if(del.classList.contains("armed")){
+          post("/api/collections/delete", {id:c.id});
+        }else{
+          del.classList.add("armed"); del.textContent = "Emin?";
+          setTimeout(function(){ del.classList.remove("armed"); del.textContent = "✕"; }, 2500);
+        }
+      });
+      row.appendChild(del);
+    }
+    li.appendChild(row);
+    cl.appendChild(li);
+  });
+  document.getElementById("archCount").textContent = d.archive_count || 0;
+  document.getElementById("archiveNav").className = "colrow" + (state.view === "archive" ? " active" : "");
+
+  // kurtarma bandı
+  const rb = document.getElementById("recoveryBanner");
+  if(d.recovery_count > 0){
+    document.getElementById("recText").textContent =
+      "Önceki oturum beklenmedik şekilde kapanmış — " + d.recovery_count + " öğe kurtarılabilir.";
+    rb.classList.add("show");
+  }else{
+    rb.classList.remove("show");
+  }
+
+  document.getElementById("started").textContent = "Oturum: " + fmtDT(d.started);
+
+  if(state.view === "archive"){
+    document.getElementById("listView").style.display = "none";
+    document.getElementById("archiveView").style.display = "block";
+    document.getElementById("viewTitle").textContent = "🗄 Arşiv";
+    document.getElementById("capBadge").style.display = "none";
+    document.getElementById("statChips").style.display = "none";
+    document.getElementById("progressWrap").style.display = "none";
+    document.getElementById("vchips").style.display = "flex";
+    renderArchive();
+    return;
+  }
+  document.getElementById("listView").style.display = "block";
+  document.getElementById("archiveView").style.display = "none";
+  document.getElementById("capBadge").style.display = "";
+  document.getElementById("statChips").style.display = "flex";
+  document.getElementById("progressWrap").style.display = "block";
+  document.getElementById("viewTitle").textContent = activeCol.name;
+
+  const mine = items.filter(function(i){ return i.collection === active; });
+  const shown = mine.filter(matchesView).filter(matchesQuery);
+
+  const pending = shown.filter(function(i){ return !i.checked; }).sort(function(a,b){ return a.id - b.id; });
+  const done = shown.filter(function(i){ return i.checked; }).sort(function(a,b){
+    return String(a.checked_at||"").localeCompare(String(b.checked_at||"")) || (a.id - b.id);
+  });
+  const pendAll = mine.filter(function(i){ return !i.checked; }).length;
+  const doneAll = mine.length - pendAll;
+
+  document.getElementById("cntPending").textContent = pendAll;
+  document.getElementById("cntDone").textContent = doneAll;
+  document.getElementById("cntTotal").textContent = mine.length;
+  document.getElementById("cntP2").textContent = pending.length ? "(" + pending.length + ")" : "";
+  document.getElementById("cntD2").textContent = done.length ? "(" + done.length + ")" : "";
+  document.getElementById("bar").style.width = mine.length ? Math.round(doneAll / mine.length * 100) + "%" : "0%";
+
+  renderGrouped(document.getElementById("pendingArea"), pending, "copied_at", false, true);
+  const ep = document.getElementById("emptyPending");
+  if(!pending.length){
+    ep.style.display = "block";
+    ep.textContent = (state.query || state.viewFilter !== "all")
+      ? "Bu filtre/aramayla eşleşen bekleyen öğe yok."
+      : "Bu koleksiyonda bekleyen bir şey yok. Bir şey kopyala (Ctrl+C) — anında burada belirecek.";
+  }else{
+    ep.style.display = "none";
+  }
+  renderGrouped(document.getElementById("doneArea"), done, "checked_at", true, false);
+  document.getElementById("doneSection").style.display = done.length ? "block" : "none";
+
+  const bb = document.getElementById("bulkbar");
+  bb.classList.toggle("show", state.selecting && state.selected.size > 0);
+  document.getElementById("bulkCount").textContent = state.selected.size + " seçili";
+}
+
+function archCard(e){
+  const li = document.createElement("li");
+  li.className = "card done";
+  const body = document.createElement("div");
+  body.className = "body";
+  const isSafeLink = e.is_link && /^https?:\/\//i.test(e.url || "");
+  if(isSafeLink){
+    const a = document.createElement("a");
+    a.href = e.url; a.target = "_blank"; a.rel = "noopener noreferrer";
+    a.textContent = (e.title || e.text).trim();
+    body.appendChild(a);
+  }else{
+    const p = document.createElement("p");
+    p.textContent = e.text;
+    body.appendChild(p);
+  }
+  const meta = document.createElement("div");
+  meta.className = "meta";
+  const info = document.createElement("span");
+  info.textContent = "🗄 " + fmtDT(e.archived_at) + " · " + (e.collection_name || "Genel");
+  meta.appendChild(info);
+  if(isSafeLink){
+    const hc = document.createElement("span");
+    hc.className = "badge hostchip" + (isInsta(e.url) ? " insta" : "");
+    hc.textContent = (isInsta(e.url) ? "📷 " : "") + hostOf(e.url);
+    meta.appendChild(hc);
+  }
+  body.appendChild(meta);
+  li.appendChild(body);
+
+  const actions = document.createElement("div");
+  actions.className = "actions";
+  const rs = document.createElement("button");
+  rs.className = "icobtn"; rs.title = "Aktif koleksiyona geri yükle"; rs.textContent = "↩";
+  rs.addEventListener("click", function(){ post("/api/archive/restore", {aids:[e.aid]}); });
+  actions.appendChild(rs);
+  const del = document.createElement("button");
+  del.className = "icobtn danger"; del.title = "Arşivden kalıcı sil"; del.textContent = "✕";
+  del.addEventListener("click", function(){ post("/api/archive/delete", {aids:[e.aid]}); });
+  actions.appendChild(del);
+  li.appendChild(actions);
+  return li;
+}
+
+function renderArchive(){
+  const a = state.archive;
+  const area = document.getElementById("archiveArea");
+  const note = document.getElementById("archNote");
+  const d = state.data || {};
+  note.textContent = "Saklama kuralı: " + (RETENTION_LABEL[d.retention] || d.retention) +
+    " — süresi dolan arşiv kayıtları otomatik silinir. Ayarlar bölümünden değiştirebilirsin.";
+  if(!a){ area.innerHTML = ""; return; }
+  let items = (a.items || []).slice().sort(function(x,y){
+    return String(y.archived_at||"").localeCompare(String(x.archived_at||""));
+  });
+  items = items.filter(matchesView).filter(matchesQuery);
+  area.innerHTML = "";
+  let curKey = null, curUl = null;
+  for(const e of items){
+    const k = String(e.archived_at || "").slice(0,10);
+    if(k !== curKey || !curUl){
+      curKey = k;
+      const lbl = document.createElement("div");
+      lbl.className = "daylabel";
+      lbl.textContent = dayLabel(k);
+      area.appendChild(lbl);
+      curUl = document.createElement("ul"); curUl.className = "cards";
+      area.appendChild(curUl);
+    }
+    curUl.appendChild(archCard(e));
+  }
+  document.getElementById("emptyArchive").style.display = items.length ? "none" : "block";
+}
+
+function renderFromCache(){ render(); }
+
+/* ---------------- veri çekme ---------------- */
+async function refresh(){
+  let d, a = null;
+  try{
+    const r = await fetch("/api/items", {cache:"no-store"});
+    d = await r.json();
+    if(state.view === "archive"){
+      const r2 = await fetch("/api/archive", {cache:"no-store"});
+      a = await r2.json();
+    }
+  }catch(e){
+    document.body.classList.add("offline");
+    return;
+  }
+  document.body.classList.remove("offline");
+  // gün anahtarı da karşılaştırmaya dahil: gece yarısı geçince yeniden çizilir
+  const s = JSON.stringify(d) + "|" + JSON.stringify(a) + "|" + dayKeyOf(new Date()) + "|" + state.view;
+  if(s === state.last) return;
+  state.last = s;
+  state.data = d;
+  if(a) state.archive = a;
+  render();
+}
+
+/* ---------------- olaylar ---------------- */
+document.getElementById("capSwitch").addEventListener("click", function(){
+  const on = state.data ? !!state.data.capture_enabled : true;
+  post("/api/settings", {capture_enabled: !on});
+});
+
+document.querySelectorAll(".fbtn").forEach(function(b){
+  b.addEventListener("click", function(){ post("/api/settings", {filter_mode: b.dataset.mode}); });
+});
+document.getElementById("domSave").addEventListener("click", function(){
+  const doms = document.getElementById("domInput").value.split(",").map(function(s){ return s.trim(); }).filter(Boolean);
+  post("/api/settings", {custom_domains: doms});
+  miniToast("Alan adları kaydedildi");
+});
+document.getElementById("retention").addEventListener("change", function(e){
+  post("/api/settings", {retention: e.target.value});
+  miniToast("Saklama süresi: " + (RETENTION_LABEL[e.target.value] || e.target.value));
+});
+
+document.querySelectorAll(".vchip").forEach(function(b){
+  b.addEventListener("click", function(){
+    state.viewFilter = b.dataset.v;
+    renderFromCache();
+  });
+});
+
+document.getElementById("archiveNav").addEventListener("click", async function(){
+  state.view = "archive";
+  state.last = "";
+  await refresh();
+});
+
+(function(){
+  const inp = document.getElementById("newColName");
+  const btn = document.getElementById("newColBtn");
+  async function create(){
+    const name = inp.value.trim();
+    if(!name) return;
+    const res = await post("/api/collections", {name:name});
+    if(res && res.ok){ inp.value = ""; state.view = "list"; }
+  }
+  btn.addEventListener("click", create);
+  inp.addEventListener("keydown", function(e){ if(e.key === "Enter") create(); });
+})();
+
+document.getElementById("search").addEventListener("input", function(e){
+  state.query = e.target.value;
+  renderFromCache();
+});
+
+(function(){
+  const btn = document.getElementById("clearBtn");
+  let armed = false, timer = null;
+  function disarm(){ armed = false; btn.classList.remove("armed"); btn.textContent = "Temizle"; }
+  btn.addEventListener("click", function(){
+    if(state.view === "archive"){ miniToast("Arşivde tekil silme kullan (✕)", true); return; }
+    if(!armed){
+      armed = true; btn.classList.add("armed"); btn.textContent = "Emin misin?";
+      timer = setTimeout(disarm, 3000);
+      return;
+    }
+    clearTimeout(timer); disarm();
+    if(state.data) post("/api/clear", {collection: state.data.active_collection});
+  });
+})();
+
+function visiblePending(){
+  const d = state.data;
+  if(!d) return [];
+  return (d.items||[]).filter(function(i){
+    return i.collection === d.active_collection && !i.checked;
+  }).filter(matchesView).filter(matchesQuery).sort(function(a,b){ return a.id - b.id; });
+}
+
+document.getElementById("copyListBtn").addEventListener("click", async function(){
+  const items = visiblePending();
+  if(!items.length){ miniToast("Kopyalanacak bekleyen öğe yok", true); return; }
+  const text = items.map(function(i){ return i.text; }).join("\n");
+  if(await copyText(text)) miniToast(items.length + " öğe panoya kopyalandı");
+});
+
+document.getElementById("downloadBtn").addEventListener("click", function(){
+  const d = state.data;
+  if(!d) return;
+  const col = (d.collections.find(function(c){ return c.id === d.active_collection; }) || {name:"liste"}).name;
+  const mine = (d.items||[]).filter(function(i){ return i.collection === d.active_collection; })
+    .filter(matchesView).filter(matchesQuery);
+  const pend = mine.filter(function(i){ return !i.checked; });
+  const done = mine.filter(function(i){ return i.checked; });
+  let out = "# CopyTracker — " + col + " — " + fmtDT(new Date().toISOString().slice(0,19)) + "\n\n";
+  out += "## Bekleyenler (" + pend.length + ")\n";
+  pend.forEach(function(i){ out += "- [ ] " + (i.title ? i.title + " — " : "") + i.text + "\n"; });
+  out += "\n## Tamamlananlar (" + done.length + ")\n";
+  done.forEach(function(i){ out += "- [x] " + (i.title ? i.title + " — " : "") + i.text + "\n"; });
+  const blob = new Blob([out], {type:"text/plain;charset=utf-8"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "copytracker-" + col.replace(/\s+/g,"_") + "-" + dayKeyOf(new Date()) + ".txt";
+  a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); }, 3000);
+});
+
+/* seçim modu */
+document.getElementById("selectBtn").addEventListener("click", function(){
+  state.selecting = !state.selecting;
+  if(!state.selecting) state.selected.clear();
+  this.textContent = state.selecting ? "☑ Seçim: açık" : "☑ Seç";
+  renderFromCache();
+});
+document.getElementById("bulkCancel").addEventListener("click", function(){
+  state.selecting = false; state.selected.clear();
+  document.getElementById("selectBtn").textContent = "☑ Seç";
+  renderFromCache();
+});
+document.getElementById("bulkCopy").addEventListener("click", async function(){
+  const d = state.data; if(!d) return;
+  const items = (d.items||[]).filter(function(i){ return state.selected.has(i.id); });
+  const text = items.map(function(i){ return i.text; }).join("\n");
+  if(text && await copyText(text)) miniToast(items.length + " öğe kopyalandı");
+});
+document.getElementById("bulkArchive").addEventListener("click", async function(){
+  const ids = Array.from(state.selected);
+  state.selected.clear();
+  const r = await post("/api/archive", {ids:ids});
+  if(r && r.ok) miniToast(r.moved + " öğe arşivlendi");
+});
+document.getElementById("bulkDelete").addEventListener("click", async function(){
+  const ids = Array.from(state.selected);
+  state.selected.clear();
+  const r = await post("/api/delete", {ids:ids});
+  if(r && r.ok) miniToast(r.removed + " öğe silindi");
+});
+
+document.getElementById("archiveDoneBtn").addEventListener("click", async function(){
+  const d = state.data; if(!d) return;
+  const ids = (d.items||[]).filter(function(i){
+    return i.collection === d.active_collection && i.checked;
+  }).map(function(i){ return i.id; });
+  if(!ids.length){ miniToast("Arşivlenecek tamamlanmış öğe yok", true); return; }
+  const r = await post("/api/archive", {ids:ids});
+  if(r && r.ok) miniToast(r.moved + " öğe arşivlendi");
+});
+
+document.getElementById("recRestore").addEventListener("click", async function(){
+  const r = await post("/api/recovery", {action:"restore"});
+  if(r && r.ok) miniToast(r.restored + " öğe geri yüklendi");
+});
+document.getElementById("recDiscard").addEventListener("click", function(){
+  post("/api/recovery", {action:"discard"});
+});
+
+refresh();
+setInterval(refresh, 1500);
+</script>
+</body>
+</html>
