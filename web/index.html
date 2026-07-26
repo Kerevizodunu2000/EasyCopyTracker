@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="tr">
 <head>
 <meta charset="utf-8">
@@ -11,8 +11,23 @@
   --bg:#0b0d13; --side:#0e1119; --panel:#131722; --panel2:#0f131c; --line:#232a3a;
   --text:#e8ebf2; --muted:#8b94a8; --accent:#6c8cff; --green:#34d399; --red:#f87171;
   --amber:#fbbf24;
+  --warn-bg:#3a2f14; --warn-line:#6b5518; --warn-text:#ffe08a;
+  --err-bg:#3a1d22; --err-line:#6b2a33; --err-text:#ffb4bd;
+  --info-bg:#14263a; --info-line:#1e4a6b; --info-text:#8ecbff;
+  --knob:#ffffff; --check-ink:#0b0d13; --shadow:rgba(0,0,0,.5);
 }
-html,body{background:var(--bg);color:var(--text);font-family:"Segoe UI",system-ui,-apple-system,sans-serif;min-height:100vh}
+:root[data-theme="light"]{
+  --bg:#f4f6fa; --side:#ffffff; --panel:#ffffff; --panel2:#f7f9fc; --line:#dde3ed;
+  --text:#131826; --muted:#616c82; --accent:#3f5bd4; --green:#0f9d63; --red:#dc2626;
+  --amber:#b45309;
+  --warn-bg:#fff5da; --warn-line:#e8c977; --warn-text:#7a5600;
+  --err-bg:#fdeaec; --err-line:#f2b5bd; --err-text:#a01426;
+  --info-bg:#e6f1fd; --info-line:#a9cdf3; --info-text:#0f4f8a;
+  --knob:#ffffff; --check-ink:#ffffff; --shadow:rgba(20,26,44,.14);
+}
+html,body{background:var(--bg);color:var(--text);font-family:"Segoe UI",system-ui,-apple-system,sans-serif;min-height:100vh;transition:background .2s ease,color .2s ease}
+:root[data-theme="light"] .card,
+:root[data-theme="light"] aside{box-shadow:0 1px 2px var(--shadow)}
 a{color:var(--accent)}
 button{font-family:inherit}
 select,input{font-family:inherit}
@@ -21,8 +36,11 @@ select,input{font-family:inherit}
 
 /* ---------------- kenar çubuğu ---------------- */
 aside{background:var(--side);border-right:1px solid var(--line);padding:20px 14px;position:sticky;top:0;height:100vh;overflow-y:auto;display:flex;flex-direction:column;gap:20px}
-.brand{font-size:19px;font-weight:700;letter-spacing:.3px;padding:0 6px}
+.brand{font-size:19px;font-weight:700;letter-spacing:.3px;padding:0 6px;display:flex;align-items:center}
 .brand .logo{margin-right:7px}
+#themeBtn{margin-left:auto;background:var(--panel);border:1px solid var(--line);border-radius:8px;
+  color:var(--muted);font-size:14px;line-height:1;cursor:pointer;padding:6px 9px;transition:.15s}
+#themeBtn:hover{color:var(--text);border-color:var(--accent)}
 aside h3{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted);margin:0 6px 8px}
 
 .fbtn{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:transparent;border:1px solid transparent;border-radius:9px;padding:7px 10px;color:var(--muted);font-size:13px;cursor:pointer;transition:.15s;margin-bottom:2px}
@@ -57,7 +75,16 @@ ul.plain{list-style:none;display:flex;flex-direction:column;gap:2px}
 .newcol button{background:var(--panel);border:1px solid var(--line);border-radius:8px;color:var(--muted);padding:0 11px;font-size:16px;cursor:pointer;transition:.15s}
 .newcol button:hover{color:var(--green);border-color:var(--green)}
 
-.settings label{display:block;font-size:11.5px;color:var(--muted);margin:0 6px 5px}
+.setrow{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:9px;cursor:pointer;transition:.15s;margin-bottom:2px}
+.setrow:hover{background:var(--panel)}
+.setrow .setlbl{flex:1;font-size:12.5px;color:var(--muted)}
+.setrow.on .setlbl{color:var(--text)}
+.mini{flex:none;width:32px;height:18px}
+.mini .track{display:block;width:32px;height:18px;border-radius:99px;background:var(--line);position:relative;transition:.2s}
+.mini .track::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:var(--knob);transition:.2s}
+.setrow.on .mini .track{background:var(--green)}
+.setrow.on .mini .track::after{left:16px}
+.settings label{display:block;font-size:11.5px;color:var(--muted);margin:10px 6px 5px}
 .settings select{width:100%;background:var(--panel);border:1px solid var(--line);border-radius:8px;color:var(--text);padding:7px 10px;font-size:12.5px;outline:none}
 .shortcuts{font-size:10.5px;color:var(--muted);line-height:1.8;padding:0 6px}
 .shortcuts b{color:var(--text);font-weight:600;background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:0 5px}
@@ -73,16 +100,16 @@ main{padding:22px 26px 110px;max-width:920px;width:100%}
 
 .switch{display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;background:var(--panel);border:1px solid var(--line);border-radius:99px;padding:5px 12px 5px 6px}
 .switch .track{width:34px;height:19px;border-radius:99px;background:var(--line);position:relative;transition:.2s}
-.switch .track::after{content:"";position:absolute;top:2px;left:2px;width:15px;height:15px;border-radius:50%;background:#fff;transition:.2s}
+.switch .track::after{content:"";position:absolute;top:2px;left:2px;width:15px;height:15px;border-radius:50%;background:var(--knob);transition:.2s}
 .switch.on .track{background:var(--green)}
 .switch.on .track::after{left:17px}
 .switch .lbl{font-size:12.5px;color:var(--muted)}
 .switch.on .lbl{color:var(--text)}
 body.paused main{--pauseline:1}
-#pausedBanner{display:none;background:#3a2f14;border:1px solid #6b5518;color:#ffe08a;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:13.5px}
+#pausedBanner{display:none;background:var(--warn-bg);border:1px solid var(--warn-line);color:var(--warn-text);border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:13.5px}
 body.paused #pausedBanner{display:block}
-#emptyDomainsBanner{display:none;background:#3a2f14;border:1px solid #6b5518;color:#ffe08a;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:13.5px;line-height:1.6}
-#emptyDomainsBanner code{background:rgba(0,0,0,.25);border-radius:4px;padding:1px 5px}
+#emptyDomainsBanner{display:none;background:var(--warn-bg);border:1px solid var(--warn-line);color:var(--warn-text);border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:13.5px;line-height:1.6}
+#emptyDomainsBanner code{background:rgba(127,127,127,.22);border-radius:4px;padding:1px 5px}
 body.nodomains #emptyDomainsBanner{display:block}
 
 .stats{display:flex;gap:8px;margin-left:auto;flex-wrap:wrap}
@@ -107,15 +134,15 @@ body.nodomains #emptyDomainsBanner{display:block}
 .progress{margin:12px 0 20px;height:5px;background:var(--panel);border-radius:99px;overflow:hidden}
 .progress i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--green));border-radius:99px;transition:width .4s ease}
 
-#offline{display:none;background:#3a1d22;border:1px solid #6b2a33;color:#ffb4bd;border-radius:10px;padding:10px 14px;margin-bottom:16px;font-size:13.5px}
+#offline{display:none;background:var(--err-bg);border:1px solid var(--err-line);color:var(--err-text);border-radius:10px;padding:10px 14px;margin-bottom:16px;font-size:13.5px}
 body.offline #offline{display:block}
-#recoveryBanner{display:none;background:#14263a;border:1px solid #1e4a6b;color:#8ecbff;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:13.5px;align-items:center;gap:10px;flex-wrap:wrap}
+#recoveryBanner{display:none;background:var(--info-bg);border:1px solid var(--info-line);color:var(--info-text);border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:13.5px;align-items:center;gap:10px;flex-wrap:wrap}
 #recoveryBanner.show{display:flex}
 #recoveryBanner button{background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:5px 12px;font-size:12px;cursor:pointer}
 #recoveryBanner button:hover{border-color:var(--accent)}
 
 /* seçim çubuğu */
-#bulkbar{display:none;position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--panel);border:1px solid var(--accent);border-radius:14px;padding:10px 16px;z-index:60;box-shadow:0 8px 30px rgba(0,0,0,.5);align-items:center;gap:10px}
+#bulkbar{display:none;position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--panel);border:1px solid var(--accent);border-radius:14px;padding:10px 16px;z-index:60;box-shadow:0 8px 30px var(--shadow);align-items:center;gap:10px}
 #bulkbar.show{display:flex}
 #bulkbar .bcount{font-size:13px;color:var(--accent);font-weight:600;margin-right:4px}
 #bulkbar button{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:9px;padding:7px 13px;font-size:12.5px;cursor:pointer;transition:.15s}
@@ -145,7 +172,7 @@ body.selecting .actions{display:none}
 
 .check{flex:none;width:26px;height:26px;margin-top:1px;border-radius:50%;border:2px solid var(--muted);background:transparent;color:transparent;font-size:14px;line-height:1;cursor:pointer;transition:.15s}
 .check:hover{border-color:var(--green);color:var(--green)}
-.card.done .check{background:var(--green);border-color:var(--green);color:#0b0d13;font-weight:700}
+.card.done .check{background:var(--green);border-color:var(--green);color:var(--check-ink);font-weight:700}
 
 .body{flex:1;min-width:0}
 .linkline{display:flex;align-items:flex-start;gap:8px;min-width:0}
@@ -184,7 +211,7 @@ body.selecting .actions{display:none}
 /* mini toast */
 #miniToast{position:fixed;bottom:18px;right:18px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 16px;font-size:13px;color:var(--text);z-index:90;opacity:0;transform:translateY(8px);transition:.25s;pointer-events:none}
 #miniToast.show{opacity:1;transform:none}
-#miniToast.err{border-color:var(--red);color:#ffb4bd}
+#miniToast.err{border-color:var(--red);color:var(--err-text)}
 
 @media (max-width:860px){
   .app{grid-template-columns:1fr}
@@ -196,7 +223,10 @@ body.selecting .actions{display:none}
 <body>
 <div class="app">
   <aside>
-    <div class="brand"><span class="logo">📋</span>CopyTracker</div>
+    <div class="brand">
+      <span class="logo">📋</span>CopyTracker
+      <button id="themeBtn" title="Açık / koyu tema">🌙</button>
+    </div>
 
     <nav>
       <h3>Yakalama Filtresi</h3>
@@ -228,6 +258,16 @@ body.selecting .actions{display:none}
 
     <nav class="settings">
       <h3>⚙ Ayarlar</h3>
+
+      <div class="setrow" id="startupRow" title="Windows açılışında CopyTracker'ı arka planda başlatır">
+        <span class="setlbl">🚀 Windows açılışında başlat</span>
+        <span class="mini"><span class="track"></span></span>
+      </div>
+      <div class="setrow" id="notifRow" title="Her kopyalamada sağ altta çıkan bildirimi aç/kapat">
+        <span class="setlbl">🔔 Bildirimler</span>
+        <span class="mini"><span class="track"></span></span>
+      </div>
+
       <label for="retention">Arşiv saklama süresi (dolunca otomatik silinir)</label>
       <select id="retention">
         <option value="1h">1 saat</option>
@@ -334,6 +374,32 @@ const state = {
 };
 const ARM_MS = 5000;  // onay penceresi — 2,5 sn gerçek kullanımda çok kısaydı
 const HDRS = {"Content-Type": "application/json", "X-CopyTracker": "1"};
+
+/* ---------------- tema (açık / koyu) ---------------- */
+(function(){
+  const KEY = "copytracker-theme";
+  const btn = document.getElementById("themeBtn");
+  const sysDark = window.matchMedia("(prefers-color-scheme: dark)");
+  function apply(theme){
+    document.documentElement.setAttribute("data-theme", theme);
+    btn.textContent = theme === "dark" ? "🌙" : "☀️";
+    btn.title = theme === "dark" ? "Açık temaya geç" : "Koyu temaya geç";
+  }
+  let saved = null;
+  try{ saved = localStorage.getItem(KEY); }catch(e){}
+  apply(saved || (sysDark.matches ? "dark" : "light"));
+  btn.addEventListener("click", function(){
+    const next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+    apply(next);
+    try{ localStorage.setItem(KEY, next); }catch(e){}
+  });
+  // Kullanıcı kendi seçimini yapmadıysa sistem temasını takip et
+  sysDark.addEventListener("change", function(e){
+    let s = null;
+    try{ s = localStorage.getItem(KEY); }catch(err){}
+    if(!s) apply(e.matches ? "dark" : "light");
+  });
+})();
 const FDESC = {
   all: "Her kopyalanan şey kaydediliyor.",
   links: "Sadece web sitesi linkleri kaydediliyor; düz metinler atlanıyor.",
@@ -623,6 +689,8 @@ function render(){
 
   const rt = document.getElementById("retention");
   if(document.activeElement !== rt) rt.value = d.retention || "1m";
+  document.getElementById("startupRow").classList.toggle("on", !!d.startup_enabled);
+  document.getElementById("notifRow").classList.toggle("on", d.notifications_enabled !== false);
 
   document.querySelectorAll(".vchip").forEach(function(b){
     b.classList.toggle("active", b.dataset.v === state.viewFilter);
@@ -872,6 +940,16 @@ document.getElementById("domSave").addEventListener("click", function(){
   post("/api/settings", {custom_domains: doms});
   miniToast("Alan adları kaydedildi");
 });
+document.getElementById("startupRow").addEventListener("click", async function(){
+  const on = state.data ? !!state.data.startup_enabled : false;
+  const r = await post("/api/settings", {startup_enabled: !on});
+  if(r && r.ok) miniToast(!on ? "Windows açılışında başlayacak" : "Açılışta başlatma kapatıldı");
+});
+document.getElementById("notifRow").addEventListener("click", function(){
+  const on = state.data ? state.data.notifications_enabled !== false : true;
+  post("/api/settings", {notifications_enabled: !on});
+});
+
 document.getElementById("retention").addEventListener("change", function(e){
   post("/api/settings", {retention: e.target.value});
   miniToast("Saklama süresi: " + (RETENTION_LABEL[e.target.value] || e.target.value));

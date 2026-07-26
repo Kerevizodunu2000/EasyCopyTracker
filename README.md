@@ -9,29 +9,64 @@ notification, and queued in a local web UI where you process items like a to-do
 list: click a link → it opens → gets checked off → drops to "Done".
 
 Think of it as the missing bridge between clipboard managers (Ditto, CopyQ) and
-read-later apps (Pocket, Wallabag): automatic capture **and** a triage workflow.
+read-later apps (Instapaper, Wallabag): automatic capture **and** a triage workflow.
 
 ![CopyTracker screenshot](docs/screenshot.png)
 
-*UI language is Turkish. English localization PRs welcome.*
+*The interface is in Turkish. English localization contributions are welcome.*
+
+## Why this exists
+
+I built CopyTracker to solve one short, specific problem of my own: I kept copying
+dozens of links, losing track of which ones I had already opened, and wanted them
+queued somewhere I could work through one by one.
+
+It turned out useful enough to share. **It is not a commercial product and there is no
+roadmap** — but it is genuinely open to being developed further if people find it
+useful. If you have feedback, a bug, or an idea, write to
+**halilsafaksimsek@gmail.com** or open an issue.
+
+## Install
+
+**Easiest way:** double-click **`kurulum.bat`** (setup). It checks Python, installs the
+two dependencies, creates a desktop shortcut, and starts the app.
+
+Prefer doing it manually?
+
+```bat
+pip install -r requirements.txt
+start.bat
+```
+
+Requirements: Windows 10/11 and Python 3.10+ (with tkinter, included in the standard
+installer). If Python is missing, get it from [python.org](https://www.python.org/downloads/)
+and tick **"Add python.exe to PATH"** during setup.
+
+| Action | How |
+|---|---|
+| Start in the background + open the list | `start.bat` or the desktop shortcut |
+| Run with console logs | `python copytracker.py` |
+| Stop | tray icon → **Çıkış** (Quit), or `stop.bat` |
+| Web UI | http://localhost:8765 |
+
+**Shortcuts:** `Ctrl+Alt+K` toggle capture · `Ctrl+Alt+L` open the list
 
 ## Features
 
 - **Instant capture** — native Win32 clipboard listener (`AddClipboardFormatListener`), no polling
-- **To-do flow** — click a link to open it in a new tab; it's checked off and drops down; progress bar tracks completion
+- **To-do flow** — click a link to open it in a new tab; it's checked off and drops down; a progress bar tracks completion
 - **Collections** — open a "library"; new copies are routed into the active collection
 - **Capture filters** — everything / links only / Instagram only / your own domain list
 - **View filters + search** — slice what's shown: links, Instagram, plain texts
-- **RAM-first storage** — the active list is never persisted as data; the only thing written
-  while you work is a crash-recovery shadow (`session_backup.json`), deleted on clean exit
+- **RAM-first storage** — the active list is never persisted as data; the only thing written while you work is a crash-recovery shadow, deleted on clean exit
 - **Archive with retention** — archived items auto-delete after 1 hour / 1 day / end of day / 1 month (default) / never
 - **Crash recovery** — a shadow snapshot offers restore after an unclean shutdown
 - **Page titles** — link items show the fetched page title instead of a bare URL
 - **Smart duplicates** — re-copying the same content bumps a ×N badge instead of creating a new row; completed items are revived
 - **Bulk actions** — multi-select → copy / archive / delete; copy the whole list or download as `.txt`
 - **Pin** 📌, **QR codes** ▦ (open links on your phone), **copy-back** ⧉ (without re-capturing)
+- **Settings** — start with Windows, notifications on/off, archive retention
 - **System tray** — toggle capture, open the list, quit
-- **Global hotkeys** — `Ctrl+Alt+K` toggle capture, `Ctrl+Alt+L` open the list
 - **Own notification popups** — bottom-right toasts that work even when Windows notifications are disabled
 
 ## Privacy & security
@@ -43,35 +78,17 @@ read-later apps (Pocket, Wallabag): automatic capture **and** a triage workflow.
   `web/index.html` if you would rather it didn't.
 - Copies flagged by password managers (`ExcludeClipboardContentFromMonitorProcessing`)
   are **never** recorded.
-- The local API is CSRF-protected (custom header + origin checks), so web pages you
-  visit cannot read or wipe your list.
-- `settings.json`, `archive.json`, logs and session snapshots are gitignored — they
-  contain personal clipboard data. Never commit them.
+- The local API is protected against CSRF and DNS rebinding (Host validation, custom
+  header, origin allowlist), so web pages you visit cannot read or wipe your list.
+- The log stores counters and hostnames only — never clipboard content.
+- Personal data lives outside the repository and is gitignored. Never commit it.
 
-Found a vulnerability? Please **do not** open a public issue — email the maintainer
-instead (see the repository profile).
-
-## Requirements
-
-- Windows 10/11
-- Python 3.10+ (with tkinter, included in the standard installer)
-
-## Install & run
-
-```bat
-pip install -r requirements.txt
-start.bat        :: starts in the background and opens http://localhost:8765
-```
-
-| Action | How |
-|---|---|
-| Run with console logs | `python copytracker.py` |
-| Stop | tray icon → **Çıkış** (Quit), or `stop.bat` |
-| Web UI | http://localhost:8765 |
+Found a vulnerability? See [SECURITY.md](SECURITY.md) — please report privately rather
+than opening a public issue.
 
 ## Data layout
 
-Personal data is stored **outside the repository**, in `%LOCALAPPDATA%\CopyTracker`:
+Personal data is stored in `%LOCALAPPDATA%\CopyTracker`:
 
 | Data | File | Behaviour |
 |---|---|---|
@@ -87,7 +104,7 @@ Personal data is stored **outside the repository**, in `%LOCALAPPDATA%\CopyTrack
 
 ## Known limitations
 
-- **Windows only** — the capture layer is Win32 (`AddClipboardFormatListener`).
+- **Windows only** — the capture layer is Win32.
 - **The active list is volatile by design.** Archive anything you want to keep.
 - **Port 8765 is hardcoded.** If another app holds it, CopyTracker refuses to start
   and says so in the log.
@@ -98,10 +115,20 @@ Personal data is stored **outside the repository**, in `%LOCALAPPDATA%\CopyTrack
   loopback and single-user, but do not expose it to a network.
 - Non-text clipboard content (files, images) is intentionally not captured.
 
+## Contributing
+
+Issues and pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
+Since this started as a personal utility, expect a small scope and slow but genuine
+responses. Feedback by email works too: **halilsafaksimsek@gmail.com**
+
 ## Documentation in Turkish
 
 Türkçe belgeler için: [README.tr.md](README.tr.md)
 
 ## License
 
-[MIT](LICENSE)
+Released under the [MIT License](LICENSE) — free to use, modify and redistribute,
+including commercially, as long as the copyright notice and license text are kept.
+The software comes with no warranty.
+
+© 2026 Halil Şafak Şimşek

@@ -149,6 +149,7 @@ _settings = {
     "filter_mode": "all",
     "custom_domains": [],
     "capture_enabled": True,
+    "notifications_enabled": True,
     "retention": "1m",
     "collections": [{"id": 1, "name": "Genel", "created_at": _started}],
     "active_collection": 1,
@@ -236,6 +237,7 @@ def load_settings():
         "filter_mode": d.get("filter_mode") if d.get("filter_mode") in FILTER_MODES else "all",
         "custom_domains": [s for s in d.get("custom_domains", []) if isinstance(s, str)][:50],
         "capture_enabled": bool(d.get("capture_enabled", True)),
+        "notifications_enabled": bool(d.get("notifications_enabled", True)),
         "retention": d.get("retention") if d.get("retention") in RETENTIONS else "1m",
         "collections": cols,
         "active_collection": active,
@@ -774,6 +776,52 @@ def purge_archive():
     return removed
 
 
+# ------------------------------------------------- Windows'la birlikte başlatma
+
+RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
+RUN_NAME = "CopyTracker"
+
+
+def _startup_command():
+    """Açılışta çalıştırılacak komut — konsolsuz pythonw tercih edilir."""
+    script = os.path.join(BASE_DIR, "copytracker.py")
+    exe = sys.executable or "python.exe"
+    pythonw = os.path.join(os.path.dirname(exe), "pythonw.exe")
+    if os.path.exists(pythonw):
+        exe = pythonw
+    return f'"{exe}" "{script}"'
+
+
+def get_startup():
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY) as k:
+            value, _ = winreg.QueryValueEx(k, RUN_NAME)
+        return bool(value)
+    except OSError:
+        return False
+
+
+def set_startup(enabled):
+    """Kayıt defterindeki Run anahtarını günceller. Hata mesajını döndürür (yoksa None)."""
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY, 0, winreg.KEY_SET_VALUE) as k:
+            if enabled:
+                winreg.SetValueEx(k, RUN_NAME, 0, winreg.REG_SZ, _startup_command())
+                log("Windows açılışında başlatma açıldı.")
+            else:
+                try:
+                    winreg.DeleteValue(k, RUN_NAME)
+                except FileNotFoundError:
+                    pass
+                log("Windows açılışında başlatma kapatıldı.")
+        return None
+    except OSError as e:
+        log(f"Açılışta başlatma ayarlanamadı: {e}")
+        return str(e)
+
+
 def announce_capture(enabled):
     log("Yakalama " + ("açıldı." if enabled else "durduruldu."))
     notify("📋 Yakalama " + ("açık" if enabled else "kapalı"),
@@ -805,7 +853,10 @@ TOAST_SHOW_MS = 3200
 TOAST_MAX_AGE = 8.0
 
 
-def notify(title, msg):
+def notify(title, msg, force=False):
+    """Bildirim gösterir. force=True olanlar (ayar bildirimleri) hep gösterilir."""
+    if not force and not _settings.get("notifications_enabled", True):
+        return
     _toasts.put((title, msg, time.time()))
 
 
@@ -1314,6 +1365,8 @@ def api_items():
             "recovery_count": len(_recovery) if _recovery else 0,
             "qr_available": HAS_QR,
             "data_dir": DATA_DIR,
+            "notifications_enabled": _settings["notifications_enabled"],
+            "startup_enabled": get_startup(),
         })
 
 
@@ -1347,9 +1400,23 @@ def api_settings():
         updates["retention"] = body["retention"]
         changed.append("saklama=" + body["retention"])
 
+    if "notifications_enabled" in body:
+        updates["notifications_enabled"] = bool(body["notifications_enabled"])
+        changed.append("bildirimler=" + ("açık" if body["notifications_enabled"] else "kapalı"))
+
+    if "startup_enabled" in body:  # kayıt defteri; ayar dosyasında tutulmaz
+        err = set_startup(bool(body["startup_enabled"]))
+        if err:
+            return jsonify({"ok": False, "error": f"açılışta başlatma ayarlanamadı: {err}"}), 500
+        changed.append("açılışta başlat=" + ("açık" if body["startup_enabled"] else "kapalı"))
+
     with _lock:
         previous = {k: _settings[k] for k in updates}
         _settings.update(updates)
+    if "notifications_enabled" in body:
+        notify("🔔 Bildirimler " + ("açık" if body["notifications_enabled"] else "kapalı"),
+               "Kopyalama bildirimleri gösterilecek." if body["notifications_enabled"]
+               else "Kopyalama bildirimleri artık gösterilmeyecek.", force=True)
     if "capture_enabled" in body:
         with _lock:
             previous["capture_enabled"] = _settings["capture_enabled"]

@@ -5,8 +5,8 @@
 Please **do not** open a public issue for security problems.
 
 Report privately through GitHub's [private vulnerability reporting](https://docs.github.com/en/code-security/security-advisories/guidance-on-reporting-and-writing-information-about-vulnerabilities/privately-reporting-a-security-vulnerability)
-(Security tab → *Report a vulnerability*), or contact the maintainer directly via
-the email on their GitHub profile.
+(Security tab → *Report a vulnerability*), or email the maintainer directly at
+**halilsafaksimsek@gmail.com**.
 
 Please include: what you did, what happened, and what an attacker gains. A proof of
 concept helps a lot. Expect an initial response within a few days.

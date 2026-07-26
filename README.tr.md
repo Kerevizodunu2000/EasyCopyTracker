@@ -8,17 +8,37 @@ işlemeni sağlar. Linke tıkla → açılır → ✓ işaretlenir → aşağı 
 
 ![CopyTracker ekran görüntüsü](docs/screenshot.png)
 
-## Kurulum (bir kere)
+## Bu proje neden var?
+
+CopyTracker'ı kendi kısa ve somut bir işimi halletmek için yazdım: onlarca link
+kopyalıyor, hangisini açtığımı kaybediyor ve hepsini tek tek işleyebileceğim bir
+kuyruk istiyordum.
+
+Paylaşmaya değecek kadar işe yaradı. **Ticari bir ürün değil ve bir yol haritası yok**
+— ama ilgi görürse geliştirmeye gerçekten açık. Geri bildirim, hata ya da fikir için
+**halilsafaksimsek@gmail.com** adresine yazabilir veya issue açabilirsin.
+
+## Kurulum
+
+**En kolayı:** **`kurulum.bat`** dosyasına çift tıkla. Python'u kontrol eder, iki
+bağımlılığı kurar, masaüstüne kısayol ekler ve uygulamayı başlatır.
+
+Elle yapmak istersen:
 
 ```
 pip install -r requirements.txt
+start.bat
 ```
+
+Gereksinimler: Windows 10/11 ve Python 3.10+ (tkinter ile — standart kurulumda
+gelir). Python yoksa [python.org](https://www.python.org/downloads/) adresinden kur
+ve kurulumda **"Add python.exe to PATH"** kutusunu işaretle.
 
 ## Çalıştırma
 
 | Ne | Nasıl |
 |---|---|
-| Arka planda başlat + listeyi aç | `start.bat` (çift tıkla) |
+| Arka planda başlat + listeyi aç | `start.bat` ya da masaüstü kısayolu |
 | Konsolda çalıştır (logları gör) | `python copytracker.py` |
 | Durdur | Tepsi simgesi → **Çıkış** ya da `stop.bat` |
 
@@ -64,6 +84,7 @@ Kişisel veriler proje klasöründe değil, **`%LOCALAPPDATA%\CopyTracker`** alt
   yükleme ve kalıcı silme
 - **▦ QR kod** — linki telefonla okutup mobilde aç
 - **⧉ Geri kopyalama** — öğeyi panoya kopyalar (yeniden kaydedilmez)
+- **⚙ Ayarlar** — Windows açılışında başlat, bildirimleri aç/kapat, arşiv saklama süresi
 
 ## Bilinen sınırlar
 
@@ -99,6 +120,16 @@ e-posta ile ulaş.
   ayarlarından bağımsız çalışır; tıklayınca liste açılır.
 - Resim/dosya kopyaları kaydedilmez; "metin değil" bildirimi gösterilir.
 
+## Katkı ve geri bildirim
+
+Issue ve pull request'ler açık — bkz. [CONTRIBUTING.md](CONTRIBUTING.md). Kişisel bir
+araç olarak başladığı için kapsamı küçük, dönüşler yavaş ama gerçek olacak.
+E-posta ile de yazabilirsin: **halilsafaksimsek@gmail.com**
+
 ## Lisans
 
-[MIT](LICENSE)
+[MIT Lisansı](LICENSE) ile yayımlandı — telif ve lisans metni korunduğu sürece
+ticari kullanım dahil serbestçe kullanabilir, değiştirebilir ve dağıtabilirsin.
+Yazılım hiçbir garanti vermez.
+
+© 2026 Halil Şafak Şimşek
