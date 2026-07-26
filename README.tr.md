@@ -1,4 +1,6 @@
-# 📋 CopyTracker
+<img src="docs/icon.svg" alt="" width="72" align="left" hspace="14" vspace="4">
+
+# CopyTracker
 
 > English documentation: [README.md](README.md)
 

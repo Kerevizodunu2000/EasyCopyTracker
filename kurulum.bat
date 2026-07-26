@@ -50,6 +50,7 @@ powershell -NoProfile -Command ^
   "$s.Arguments='\"%CD%\copytracker.py\" --open';" ^
   "$s.WorkingDirectory='%CD%';" ^
   "$s.Description='CopyTracker - pano gelen kutusu';" ^
+  "if (Test-Path '%CD%\docs\copytracker.ico') { $s.IconLocation='%CD%\docs\copytracker.ico' };" ^
   "$s.Save()" >nul 2>nul
 if exist "%USERPROFILE%\Desktop\CopyTracker.lnk" (
     echo         Masaustune kisayol eklendi.

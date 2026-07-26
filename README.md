@@ -1,4 +1,6 @@
-# 📋 CopyTracker
+<img src="docs/icon.svg" alt="" width="72" align="left" hspace="14" vspace="4">
+
+# CopyTracker
 
 ![platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078d4)
 ![python](https://img.shields.io/badge/python-3.10%2B-3776ab)

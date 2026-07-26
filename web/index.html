@@ -4,7 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>CopyTracker — Kopyalananlar</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%2312070d'/><rect x='12' y='16.5' width='40' height='7' rx='3.5' fill='%23ff2d6f'/><rect x='12' y='28.5' width='28' height='7' rx='3.5' fill='%23ff5c8a' opacity='.72'/><rect x='12' y='40.5' width='34' height='7' rx='3.5' fill='%23ffa8c0' opacity='.44'/></svg>">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -37,7 +38,7 @@ select,input{font-family:inherit}
 /* ---------------- kenar çubuğu ---------------- */
 aside{background:var(--side);border-right:1px solid var(--line);padding:20px 14px;position:sticky;top:0;height:100vh;overflow-y:auto;display:flex;flex-direction:column;gap:20px}
 .brand{font-size:19px;font-weight:700;letter-spacing:.3px;padding:0 6px;display:flex;align-items:center}
-.brand .logo{margin-right:7px}
+.brand .logo{margin-right:9px;border-radius:6px;flex:none}
 #themeBtn{margin-left:auto;background:var(--panel);border:1px solid var(--line);border-radius:8px;
   color:var(--muted);font-size:14px;line-height:1;cursor:pointer;padding:6px 9px;transition:.15s}
 #themeBtn:hover{color:var(--text);border-color:var(--accent)}
@@ -224,7 +225,12 @@ body.selecting .actions{display:none}
 <div class="app">
   <aside>
     <div class="brand">
-      <span class="logo">📋</span>CopyTracker
+      <svg class="logo" viewBox="0 0 64 64" width="22" height="22" aria-hidden="true">
+        <rect width="64" height="64" rx="14" fill="#12070d"/>
+        <rect x="12" y="16.5" width="40" height="7" rx="3.5" fill="#ff2d6f"/>
+        <rect x="12" y="28.5" width="28" height="7" rx="3.5" fill="#ff5c8a" opacity=".72"/>
+        <rect x="12" y="40.5" width="34" height="7" rx="3.5" fill="#ffa8c0" opacity=".44"/>
+      </svg>CopyTracker
       <button id="themeBtn" title="Açık / koyu tema">🌙</button>
     </div>
 

@@ -9,6 +9,9 @@ this project uses [Semantic Versioning](https://semver.org/).
 First public release.
 
 ### Added
+- Application icon ("Gece"): three stacked bars in rose tones on a near-black
+  ground, shipped as a multi-size `.ico` (16–256 px) plus an SVG source. Used for
+  the tray, the window, the browser tab, the desktop shortcut and the READMEs.
 - RAM-first storage: the active list never touches disk; only archived items are persisted.
 - Archive (`archive.json`) with automatic retention: 1 hour / 1 day / end of day /
   1 month (default) / forever.

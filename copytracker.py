@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """
 CopyTracker v3 — Pano gelen kutusu / link triage aracı.
 
@@ -62,6 +62,7 @@ RECOVERY_FILE = os.path.join(DATA_DIR, "recovery_pending.json")
 LEGACY_FILE = os.path.join(BASE_DIR, "data.json")
 LOG_FILE = os.path.join(DATA_DIR, "copytracker.log")
 PID_FILE = os.path.join(DATA_DIR, "copytracker.pid")
+ICON_FILE = os.path.join(BASE_DIR, "docs", "copytracker.ico")
 HOST = "127.0.0.1"
 PORT = 8765
 URL = f"http://localhost:{PORT}"
@@ -894,14 +895,14 @@ def toast_thread():
             root.attributes("-alpha", 0.0)
             left, top, right, bottom = _work_area()
             root.geometry(f"{TOAST_W}x{TOAST_H}+{right - TOAST_W - 16}+{bottom - TOAST_H - 16}")
-            root.configure(bg="#202124")
-            tk.Frame(root, bg="#6c8cff", width=4).pack(side="left", fill="y")
-            box = tk.Frame(root, bg="#202124")
+            root.configure(bg="#1a0f15")
+            tk.Frame(root, bg="#ff2d6f", width=4).pack(side="left", fill="y")  # marka rengi
+            box = tk.Frame(root, bg="#1a0f15")
             box.pack(side="left", fill="both", expand=True, padx=14, pady=10)
-            tk.Label(box, text=title, bg="#202124", fg="#ffffff",
+            tk.Label(box, text=title, bg="#1a0f15", fg="#ffffff",
                      font=("Segoe UI", 10, "bold"), anchor="w", justify="left",
                      wraplength=TOAST_W - 50).pack(fill="x")
-            tk.Label(box, text=msg, bg="#202124", fg="#c6cbd4",
+            tk.Label(box, text=msg, bg="#1a0f15", fg="#c6cbd4",
                      font=("Segoe UI", 9), anchor="w", justify="left",
                      wraplength=TOAST_W - 50).pack(fill="x", pady=(3, 0))
 
@@ -953,6 +954,10 @@ WM_LBUTTONDBLCLK = 0x0203
 NIM_ADD, NIM_MODIFY, NIM_DELETE = 0, 1, 2
 NIF_MESSAGE, NIF_ICON, NIF_TIP = 1, 2, 4
 MOD_ALT, MOD_CONTROL, MOD_NOREPEAT = 1, 2, 0x4000
+IMAGE_ICON = 1
+LR_LOADFROMFILE, LR_DEFAULTSIZE = 0x0010, 0x0040
+SM_CXSMICON, SM_CXICON = 49, 11
+WM_SETICON, ICON_SMALL, ICON_BIG = 0x0080, 0, 1
 TPM_RIGHTBUTTON, TPM_RETURNCMD = 0x0002, 0x0100
 MF_STRING, MF_SEPARATOR = 0x0000, 0x0800
 ID_TRAY_OPEN, ID_TRAY_TOGGLE, ID_TRAY_EXIT = 1001, 1002, 1003
@@ -1036,6 +1041,11 @@ user32.GetParent.argtypes = [wt.HWND]
 user32.GetParent.restype = wt.HWND
 user32.LoadIconW.argtypes = [wt.HINSTANCE, wt.LPVOID]
 user32.LoadIconW.restype = wt.HANDLE
+user32.LoadImageW.argtypes = [wt.HINSTANCE, wt.LPCWSTR, wt.UINT,
+                              ctypes.c_int, ctypes.c_int, wt.UINT]
+user32.LoadImageW.restype = wt.HANDLE
+user32.SendMessageW.argtypes = [wt.HWND, wt.UINT, wt.WPARAM, wt.LPARAM]
+user32.SendMessageW.restype = LRESULT
 user32.CreatePopupMenu.argtypes = []
 user32.CreatePopupMenu.restype = wt.HMENU
 user32.AppendMenuW.argtypes = [wt.HMENU, wt.UINT, ctypes.c_size_t, wt.LPCWSTR]
@@ -1191,6 +1201,20 @@ _hwnd = None
 _tray_data = None
 
 
+def _app_icon(size=0):
+    """docs/copytracker.ico'yu yükler; bulunamazsa Windows varsayılanına düşer.
+
+    size=0 → sistem tepsi için uygun küçük boyutu ikondan kendisi seçer.
+    """
+    if os.path.exists(ICON_FILE):
+        h = user32.LoadImageW(None, ICON_FILE, IMAGE_ICON, size, size,
+                              LR_LOADFROMFILE | LR_DEFAULTSIZE)
+        if h:
+            return h
+        log("Uygulama ikonu yüklenemedi; varsayılan simge kullanılıyor.")
+    return user32.LoadIconW(None, ctypes.c_void_p(32512))  # IDI_APPLICATION
+
+
 def _tray_add(hwnd):
     global _tray_data
     nid = NOTIFYICONDATAW()
@@ -1199,7 +1223,7 @@ def _tray_add(hwnd):
     nid.uID = 1
     nid.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP
     nid.uCallbackMessage = WM_TRAY
-    nid.hIcon = user32.LoadIconW(None, ctypes.c_void_p(32512))  # IDI_APPLICATION
+    nid.hIcon = _app_icon(user32.GetSystemMetrics(SM_CXSMICON))
     nid.szTip = "CopyTracker — pano gelen kutusu"
     if shell32.Shell_NotifyIconW(NIM_ADD, ctypes.byref(nid)):
         _tray_data = nid
@@ -1279,6 +1303,9 @@ def run_listener():
         raise ctypes.WinError(ctypes.get_last_error())
     if not user32.AddClipboardFormatListener(_hwnd):
         raise ctypes.WinError(ctypes.get_last_error())
+    # Pencere ikonu: Alt+Tab ve görev yöneticisinde uygulama simgesi görünsün
+    user32.SendMessageW(_hwnd, WM_SETICON, ICON_SMALL, _app_icon(user32.GetSystemMetrics(SM_CXSMICON)))
+    user32.SendMessageW(_hwnd, WM_SETICON, ICON_BIG, _app_icon(user32.GetSystemMetrics(SM_CXICON)))
     _tray_add(_hwnd)
     if not user32.RegisterHotKey(_hwnd, HK_TOGGLE, MOD_CONTROL | MOD_ALT | MOD_NOREPEAT, 0x4B):
         log("Ctrl+Alt+K kısayolu alınamadı (başka uygulama kullanıyor olabilir).")
@@ -1347,6 +1374,13 @@ def security_headers(resp):
 @app.get("/")
 def index():
     return send_file(os.path.join(BASE_DIR, "web", "index.html"), max_age=0)
+
+
+@app.get("/favicon.ico")
+def favicon():
+    if os.path.exists(ICON_FILE):
+        return send_file(ICON_FILE, max_age=86400)
+    return ("", 404)
 
 
 @app.get("/api/items")
