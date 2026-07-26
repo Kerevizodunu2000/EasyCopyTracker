@@ -18,8 +18,10 @@ venv/
 
 # ─── Geliştirme / test artıkları ────────────────────────────────
 .playwright-mcp/
+.ruff_cache/
 copytracker-*.png
 *.tmp
+*.corrupt
 
 # ─── İşletim sistemi ────────────────────────────────────────────
 Thumbs.db

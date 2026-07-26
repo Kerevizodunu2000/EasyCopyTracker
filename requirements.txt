@@ -1,2 +1,2 @@
-flask
-qrcode
+flask>=3.0
+qrcode>=7.4

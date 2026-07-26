@@ -138,6 +138,7 @@ ul.cards{list-style:none;display:flex;flex-direction:column;gap:8px}
 body.selecting .selbox{display:block}
 .card.selected .selbox{background:var(--accent);border-color:var(--accent);color:#fff}
 body.selecting .check{display:none}
+body.selecting .actions{display:none}
 
 .check{flex:none;width:26px;height:26px;margin-top:1px;border-radius:50%;border:2px solid var(--muted);background:transparent;color:transparent;font-size:14px;line-height:1;cursor:pointer;transition:.15s}
 .check:hover{border-color:var(--green);color:var(--green)}
@@ -241,6 +242,7 @@ body.selecting .check{display:none}
     <div class="sideinfo">
       <div id="started"></div>
       <div>Aktif liste RAM'de · arşiv <code>archive.json</code></div>
+      <div id="dataDir" title="Arşiv ve ayarların saklandığı klasör"></div>
     </div>
   </aside>
 
@@ -456,7 +458,11 @@ function card(it, isDone){
     if(it.title){
       const su = document.createElement("span");
       su.className = "suburl";
-      su.textContent = it.text.trim();
+      // Ham metin yerine normalize URL: userinfo (https://iyi.com@kotu.com) gibi
+      // yanıltıcı biçimler burada gerçek adresi gizleyemesin.
+      let shownUrl = it.text.trim();
+      try{ const u = new URL(it.url); shownUrl = u.origin + u.pathname + u.search; }catch(e){}
+      su.textContent = shownUrl;
       wrap.appendChild(su);
     }
     line.appendChild(wrap);
@@ -665,6 +671,12 @@ function render(){
   }
 
   document.getElementById("started").textContent = "Oturum: " + fmtDT(d.started);
+  const dd = document.getElementById("dataDir");
+  if(d.data_dir && dd.textContent !== d.data_dir){
+    dd.textContent = d.data_dir;
+    dd.style.wordBreak = "break-all";
+    dd.style.opacity = ".7";
+  }
 
   if(state.view === "archive"){
     document.getElementById("listView").style.display = "none";
@@ -685,6 +697,12 @@ function render(){
   document.getElementById("viewTitle").textContent = activeCol.name;
 
   const mine = items.filter(function(i){ return i.collection === active; });
+  // Seçim kümesini görünenlerle kesiştir: koleksiyon değişince, öğe silinince ya da
+  // uygulama yeniden başlayıp id'ler sıfırlanınca yanlış hedefe toplu işlem yapılmasın.
+  if(state.selected.size){
+    const visible = new Set(mine.map(function(i){ return i.id; }));
+    for(const id of Array.from(state.selected)) if(!visible.has(id)) state.selected.delete(id);
+  }
   const shown = mine.filter(matchesView).filter(matchesQuery);
 
   const pending = shown.filter(function(i){ return !i.checked; }).sort(function(a,b){ return a.id - b.id; });
@@ -908,7 +926,10 @@ document.getElementById("downloadBtn").addEventListener("click", function(){
     .filter(matchesView).filter(matchesQuery);
   const pend = mine.filter(function(i){ return !i.checked; });
   const done = mine.filter(function(i){ return i.checked; });
-  let out = "# CopyTracker — " + col + " — " + fmtDT(new Date().toISOString().slice(0,19)) + "\n\n";
+  const n = new Date();  // yerel saat — uygulamanın geri kalanıyla tutarlı olsun
+  const stamp = pad(n.getDate()) + "." + pad(n.getMonth()+1) + "." + n.getFullYear() +
+    " " + pad(n.getHours()) + ":" + pad(n.getMinutes());
+  let out = "# CopyTracker — " + col + " — " + stamp + "\n\n";
   out += "## Bekleyenler (" + pend.length + ")\n";
   pend.forEach(function(i){ out += "- [ ] " + (i.title ? i.title + " — " : "") + i.text + "\n"; });
   out += "\n## Tamamlananlar (" + done.length + ")\n";
