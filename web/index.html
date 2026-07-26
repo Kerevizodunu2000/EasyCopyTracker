@@ -81,6 +81,9 @@ main{padding:22px 26px 110px;max-width:920px;width:100%}
 body.paused main{--pauseline:1}
 #pausedBanner{display:none;background:#3a2f14;border:1px solid #6b5518;color:#ffe08a;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:13.5px}
 body.paused #pausedBanner{display:block}
+#emptyDomainsBanner{display:none;background:#3a2f14;border:1px solid #6b5518;color:#ffe08a;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:13.5px;line-height:1.6}
+#emptyDomainsBanner code{background:rgba(0,0,0,.25);border-radius:4px;padding:1px 5px}
+body.nodomains #emptyDomainsBanner{display:block}
 
 .stats{display:flex;gap:8px;margin-left:auto;flex-wrap:wrap}
 .chip{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:4px 12px;font-size:12.5px;color:var(--muted)}
@@ -260,6 +263,7 @@ body.selecting .actions{display:none}
     </div>
 
     <div id="pausedBanner">⏸ Yakalama kapalı — kopyaladıkların şu an kaydedilmiyor. Şalterle ya da Ctrl+Alt+K ile aç.</div>
+    <div id="emptyDomainsBanner">🎯 Filtre <b>“Özel alan adları”</b> seçili ama liste boş — bu yüzden <b>hiçbir şey kaydedilmiyor</b>. Soldan alan adı ekle (ör. <code>instagram.com</code>) ya da filtreyi <b>Tümü</b> yap.</div>
     <div id="recoveryBanner">💾 <span id="recText"></span>
       <button id="recRestore">Geri Yükle</button>
       <button id="recDiscard">Yoksay</button>
@@ -323,14 +327,19 @@ body.selecting .actions{display:none}
 const state = {
   last: "", data: null, archive: null, query: "",
   view: "list", viewFilter: "all",
-  selecting: false, selected: new Set()
+  selecting: false, selected: new Set(),
+  // Silme onayı DOM'da değil burada tutulur: yeni bir kopya geldiğinde kenar
+  // çubuğu yeniden çizilir ve düğmedeki "Emin?" durumu yoksa kaybolurdu.
+  armedCollection: null, armedUntil: 0
 };
+const ARM_MS = 5000;  // onay penceresi — 2,5 sn gerçek kullanımda çok kısaydı
 const HDRS = {"Content-Type": "application/json", "X-CopyTracker": "1"};
 const FDESC = {
   all: "Her kopyalanan şey kaydediliyor.",
   links: "Sadece web sitesi linkleri kaydediliyor; düz metinler atlanıyor.",
   instagram: "Sadece instagram.com linkleri kaydediliyor.",
-  custom: "Sadece aşağıdaki alan adlarının linkleri kaydediliyor."
+  custom: "Sadece aşağıdaki alan adlarının linkleri kaydediliyor.",
+  custom_empty: "⚠️ Liste boş — hiçbir şey kaydedilmiyor. Alan adı ekle."
 };
 const RETENTION_LABEL = {"1h":"1 saat","1d":"1 gün","eod":"gün sonu","1m":"1 ay","forever":"sonsuz"};
 
@@ -595,6 +604,9 @@ function render(){
   const activeCol = cols.find(function(c){ return c.id === active; }) || {id:1, name:"Genel"};
 
   document.body.classList.toggle("paused", !d.capture_enabled);
+  // "Özel alan adları" seçili ama liste boşsa hiçbir şey yakalanmaz — sessiz kalma
+  const noDomains = d.filter_mode === "custom" && (!d.custom_domains || !d.custom_domains.length);
+  document.body.classList.toggle("nodomains", noDomains && d.capture_enabled);
   document.body.classList.toggle("selecting", state.selecting);
   const sw = document.getElementById("capSwitch");
   sw.classList.toggle("on", !!d.capture_enabled);
@@ -603,7 +615,8 @@ function render(){
   document.querySelectorAll(".fbtn").forEach(function(b){
     b.classList.toggle("active", b.dataset.mode === d.filter_mode);
   });
-  document.getElementById("fdesc").textContent = FDESC[d.filter_mode] || "";
+  document.getElementById("fdesc").textContent =
+    (noDomains ? FDESC.custom_empty : FDESC[d.filter_mode]) || "";
   document.getElementById("domRow").classList.toggle("show", d.filter_mode === "custom");
   const di = document.getElementById("domInput");
   if(document.activeElement !== di) di.value = (d.custom_domains || []).join(", ");
@@ -643,13 +656,21 @@ function render(){
     if(c.id !== 1){
       const del = document.createElement("button");
       del.className = "cdel"; del.title = "Koleksiyonu sil (öğeler Genel'e taşınır)"; del.textContent = "✕";
+      const isArmed = state.armedCollection === c.id && Date.now() < state.armedUntil;
+      if(isArmed){ del.classList.add("armed"); del.textContent = "Emin?"; }
       del.addEventListener("click", function(e){
         e.stopPropagation();
-        if(del.classList.contains("armed")){
+        if(state.armedCollection === c.id && Date.now() < state.armedUntil){
+          state.armedCollection = null;
           post("/api/collections/delete", {id:c.id});
         }else{
+          state.armedCollection = c.id;
+          state.armedUntil = Date.now() + ARM_MS;
           del.classList.add("armed"); del.textContent = "Emin?";
-          setTimeout(function(){ del.classList.remove("armed"); del.textContent = "✕"; }, 2500);
+          setTimeout(function(){
+            if(state.armedCollection === c.id) state.armedCollection = null;
+            renderFromCache();
+          }, ARM_MS);
         }
       });
       row.appendChild(del);
@@ -895,7 +916,7 @@ document.getElementById("search").addEventListener("input", function(e){
     if(state.view === "archive"){ miniToast("Arşivde tekil silme kullan (✕)", true); return; }
     if(!armed){
       armed = true; btn.classList.add("armed"); btn.textContent = "Emin misin?";
-      timer = setTimeout(disarm, 3000);
+      timer = setTimeout(disarm, ARM_MS);
       return;
     }
     clearTimeout(timer); disarm();

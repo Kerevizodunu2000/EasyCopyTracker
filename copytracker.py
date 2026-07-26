@@ -1068,6 +1068,28 @@ def read_clipboard():
 
 _events = queue.Queue()
 _last_nontext = 0.0
+_last_blind_warn = 0.0
+
+
+def warn_if_filter_blind():
+    """'Özel alan adları' seçili ama liste boşsa hiçbir şey yakalanamaz.
+
+    Bu sessiz bir çıkmazdır: arayüz 'Yakalama açık' der ama tek bir kopya bile
+    kaydedilmez. Kullanıcıyı en fazla dakikada bir uyar.
+    """
+    global _last_blind_warn
+    with _lock:
+        blind = (_settings["filter_mode"] == "custom"
+                 and not [d for d in _settings["custom_domains"] if d.strip()])
+    if not blind:
+        return
+    now = time.time()
+    if now - _last_blind_warn < 60:
+        return
+    _last_blind_warn = now
+    log("UYARI: filtre 'özel alan adları' ama liste boş — hiçbir şey kaydedilmiyor.")
+    notify("⚠️ Hiçbir şey kaydedilmiyor",
+           "Filtre 'Özel alan adları' ama liste boş. Alan adı ekle ya da 'Tümü' seç.")
 
 
 def clipboard_worker():
@@ -1087,6 +1109,7 @@ def clipboard_worker():
                 if kind in ("skip", "filtered"):
                     if kind == "filtered":
                         log(f"Filtre nedeniyle kaydedilmedi ({len(text)} karakter).")
+                        warn_if_filter_blind()
                     continue
                 # Log'a pano İÇERİĞİ yazılmaz (log dosyası paylaşılabilir/yedeklenebilir);
                 # sadece sayısal üstveri tutulur. İçerik yalnızca ekrandaki bildirimde.
