@@ -4,7 +4,7 @@ All notable changes to this project are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 this project uses [Semantic Versioning](https://semver.org/).
 
-## [3.0.0] — 2026-07-26
+## [1.0.0] — 2026-07-27
 
 First public release.
 

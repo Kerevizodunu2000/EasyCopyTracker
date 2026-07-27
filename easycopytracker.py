@@ -330,7 +330,7 @@ def migrate_from_old_name():
 
 
 def migrate_data_dir():
-    """v3.0'da uygulama klasöründe kalan verileri %LOCALAPPDATA%'ya taşır."""
+    """Eski sürümlerde uygulama klasöründe kalan verileri %LOCALAPPDATA%'ya taşır."""
     if DATA_DIR == BASE_DIR:
         return
     for name in ("settings.json", "archive.json", "session_backup.json",
@@ -346,7 +346,7 @@ def migrate_data_dir():
 
 
 def migrate_legacy():
-    """İlk v3 açılışında eski data.json içeriğini kayıpsız arşive taşır."""
+    """İlk açılışta eski data.json içeriğini kayıpsız arşive taşır."""
     if os.path.exists(SETTINGS_FILE) or not os.path.exists(LEGACY_FILE):
         return
     d = _read_json(LEGACY_FILE)
@@ -546,7 +546,7 @@ def _fetch_title(item_id, url):
             return  # iç ağ / loopback adresi — istek atma
         opener = urllib_request.build_opener(_SafeRedirect)
         req = urllib_request.Request(url, headers={
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) EasyCopyTracker/3.0"})
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) EasyCopyTracker/1.0"})
         with opener.open(req, timeout=6) as r:
             raw = r.read(131072)
         m = re.search(rb"<title[^>]*>(.*?)</title>", raw, re.IGNORECASE | re.DOTALL)
@@ -1826,7 +1826,7 @@ def main():
     threading.Thread(target=toast_thread, daemon=True).start()
     threading.Thread(target=maintenance_thread, daemon=True).start()
     threading.Thread(target=backup_thread, daemon=True).start()
-    log(f"Easy Copy Tracker v3 başladı. Web arayüzü: {URL}  (aktif liste RAM'de, arşiv diskte)")
+    log(f"Easy Copy Tracker v1.0 başladı. Web arayüzü: {URL}  (aktif liste RAM'de, arşiv diskte)")
     log(f"Veri klasörü: {DATA_DIR}")
     if not HAS_QR:
         log("Not: 'qrcode' paketi yok — QR özelliği kapalı (pip install qrcode).")
