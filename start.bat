@@ -1,6 +1,6 @@
-@echo off
+﻿@echo off
 chcp 65001 >nul
-rem CopyTracker'i arka planda baslatir ve listeyi tarayicida acar.
+rem Easy Copy Tracker'i arka planda baslatir ve listeyi tarayicida acar.
 cd /d "%~dp0"
 
 rem Ilk calistirma mi? Paketler yoksa kurulum betigine yonlendir.
@@ -14,9 +14,9 @@ if errorlevel 1 (
 
 where pythonw >nul 2>nul
 if %errorlevel%==0 (
-    start "CopyTracker" pythonw copytracker.py
+    start "Easy Copy Tracker" pythonw easycopytracker.py
 ) else (
-    start "CopyTracker" /min python copytracker.py
+    start "Easy Copy Tracker" /min python easycopytracker.py
 )
 timeout /t 2 /nobreak >nul
 start "" http://localhost:8765

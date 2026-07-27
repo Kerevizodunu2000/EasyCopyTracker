@@ -1,11 +1,11 @@
-name: Bug report
+﻿name: Bug report
 description: Something does not work as documented
 labels: [bug]
 body:
   - type: markdown
     attributes:
       value: |
-        ⚠️ **Never paste `archive.json`, `settings.json` or `copytracker.log` here** —
+        ⚠️ **Never paste `archive.json`, `settings.json` or `easycopytracker.log` here** —
         they contain your clipboard contents. Redact before sharing.
         For security vulnerabilities, see [SECURITY.md](../blob/main/SECURITY.md) instead.
 
@@ -48,5 +48,5 @@ body:
     id: logs
     attributes:
       label: Relevant log lines (redacted)
-      description: From copytracker.log — remove any clipboard content first.
+      description: From easycopytracker.log — remove any clipboard content first.
       render: text

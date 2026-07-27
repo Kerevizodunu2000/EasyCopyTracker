@@ -1,4 +1,4 @@
-# Contributing to CopyTracker
+﻿# Contributing to Easy Copy Tracker
 
 Thanks for your interest! A few ground rules:
 
@@ -6,7 +6,7 @@ Thanks for your interest! A few ground rules:
   (Windows version, Python version, what you copied, what happened).
 - **Security issues:** please do **not** open a public issue — contact the
   maintainer privately first.
-- **Pull requests:** keep them focused. Run `python -m py_compile copytracker.py`
+- **Pull requests:** keep them focused. Run `python -m py_compile easycopytracker.py`
   before submitting. The project intentionally has minimal dependencies
   (`flask`, `qrcode`) — new runtime dependencies need a strong justification.
 - **Never commit personal data:** `settings.json`, `archive.json`, logs and

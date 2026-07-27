@@ -1,4 +1,4 @@
-name: CI
+﻿name: CI
 
 on:
   push:
@@ -26,10 +26,10 @@ jobs:
           pip install ruff
 
       - name: Byte-compile
-        run: python -m compileall -q copytracker.py
+        run: python -m compileall -q easycopytracker.py
 
       - name: Lint
-        run: ruff check copytracker.py
+        run: ruff check easycopytracker.py
 
       - name: Import smoke test
-        run: python -c "import copytracker; print('import ok')"
+        run: python -c "import easycopytracker; print('import ok')"

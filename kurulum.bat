@@ -1,12 +1,12 @@
-@echo off
+﻿@echo off
 chcp 65001 >nul
 setlocal enabledelayedexpansion
-title CopyTracker - Kurulum
+title Easy Copy Tracker - Kurulum
 cd /d "%~dp0"
 
 echo.
 echo   ============================================
-echo      CopyTracker - Kurulum
+echo      Easy Copy Tracker - Kurulum
 echo   ============================================
 echo.
 
@@ -45,22 +45,22 @@ echo   [3/4] Masaustu kisayolu olusturuluyor...
 set "PYW=pythonw.exe"
 where pythonw >nul 2>nul || set "PYW=python.exe"
 powershell -NoProfile -Command ^
-  "$s=(New-Object -ComObject WScript.Shell).CreateShortcut([Environment]::GetFolderPath('Desktop')+'\CopyTracker.lnk');" ^
+  "$s=(New-Object -ComObject WScript.Shell).CreateShortcut([Environment]::GetFolderPath('Desktop')+'\Easy Copy Tracker.lnk');" ^
   "$s.TargetPath=(Get-Command '%PYW%').Source;" ^
-  "$s.Arguments='\"%CD%\copytracker.py\" --open';" ^
+  "$s.Arguments='\"%CD%\easycopytracker.py\" --open';" ^
   "$s.WorkingDirectory='%CD%';" ^
-  "$s.Description='CopyTracker - pano gelen kutusu';" ^
-  "if (Test-Path '%CD%\docs\copytracker.ico') { $s.IconLocation='%CD%\docs\copytracker.ico' };" ^
+  "$s.Description='Easy Copy Tracker - pano gelen kutusu';" ^
+  "if (Test-Path '%CD%\docs\easycopytracker.ico') { $s.IconLocation='%CD%\docs\easycopytracker.ico' };" ^
   "$s.Save()" >nul 2>nul
-if exist "%USERPROFILE%\Desktop\CopyTracker.lnk" (
+if exist "%USERPROFILE%\Desktop\Easy Copy Tracker.lnk" (
     echo         Masaustune kisayol eklendi.
 ) else (
     echo         Kisayol olusturulamadi ^(sorun degil, start.bat ile calistirin^).
 )
 
 rem --- 4) Baslat --------------------------------------------------------
-echo   [4/4] CopyTracker baslatiliyor...
-start "" "%PYW%" "%CD%\copytracker.py"
+echo   [4/4] Easy Copy Tracker baslatiliyor...
+start "" "%PYW%" "%CD%\easycopytracker.py"
 timeout /t 3 /nobreak >nul
 start "" http://localhost:8765
 

@@ -1,4 +1,4 @@
-# ─── KİŞİSEL VERİ — ASLA COMMIT'LEME ────────────────────────────
+﻿# ─── KİŞİSEL VERİ — ASLA COMMIT'LEME ────────────────────────────
 # Bu dosyalar kullanıcının pano geçmişini içerir.
 archive.json
 settings.json
@@ -19,7 +19,7 @@ venv/
 # ─── Geliştirme / test artıkları ────────────────────────────────
 .playwright-mcp/
 .ruff_cache/
-copytracker-*.png
+easycopytracker-*.png
 *.tmp
 *.corrupt
 

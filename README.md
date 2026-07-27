@@ -1,6 +1,6 @@
-<img src="docs/icon.svg" alt="" width="72" align="left" hspace="14" vspace="4">
+﻿<img src="docs/icon.svg" alt="" width="72" align="left" hspace="14" vspace="4">
 
-# CopyTracker
+# Easy Copy Tracker
 
 ![platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078d4)
 ![python](https://img.shields.io/badge/python-3.10%2B-3776ab)
@@ -13,13 +13,11 @@ list: click a link → it opens → gets checked off → drops to "Done".
 Think of it as the missing bridge between clipboard managers (Ditto, CopyQ) and
 read-later apps (Instapaper, Wallabag): automatic capture **and** a triage workflow.
 
-![CopyTracker screenshot](docs/screenshot.png)
-
 *The interface is in Turkish. English localization contributions are welcome.*
 
 ## Why this exists
 
-I built CopyTracker to solve one short, specific problem of my own: I kept copying
+I built Easy Copy Tracker to solve one short, specific problem of my own: I kept copying
 dozens of links, losing track of which ones I had already opened, and wanted them
 queued somewhere I could work through one by one.
 
@@ -30,8 +28,13 @@ useful. If you have feedback, a bug, or an idea, write to
 
 ## Install
 
-**Easiest way:** double-click **`kurulum.bat`** (setup). It checks Python, installs the
-two dependencies, creates a desktop shortcut, and starts the app.
+```bat
+git clone https://github.com/Kerevizodunu2000/EasyCopyTracker.git
+cd EasyCopyTracker
+```
+
+Then double-click **`kurulum.bat`** (setup). It checks Python, installs the two
+dependencies, creates a desktop shortcut, and starts the app.
 
 Prefer doing it manually?
 
@@ -47,7 +50,7 @@ and tick **"Add python.exe to PATH"** during setup.
 | Action | How |
 |---|---|
 | Start in the background + open the list | `start.bat` or the desktop shortcut |
-| Run with console logs | `python copytracker.py` |
+| Run with console logs | `python easycopytracker.py` |
 | Stop | tray icon → **Çıkış** (Quit), or `stop.bat` |
 | Web UI | http://localhost:8765 |
 
@@ -90,7 +93,7 @@ than opening a public issue.
 
 ## Data layout
 
-Personal data is stored in `%LOCALAPPDATA%\CopyTracker`:
+Personal data is stored in `%LOCALAPPDATA%\EasyCopyTracker`:
 
 | Data | File | Behaviour |
 |---|---|---|
@@ -101,14 +104,14 @@ Personal data is stored in `%LOCALAPPDATA%\CopyTracker`:
 
 > **Note for Microsoft Store Python users:** the Store build virtualizes `%LOCALAPPDATA%`,
 > so the real folder is under
-> `%LOCALAPPDATA%\Packages\PythonSoftwareFoundation.Python.<ver>\LocalCache\Local\CopyTracker`.
+> `%LOCALAPPDATA%\Packages\PythonSoftwareFoundation.Python.<ver>\LocalCache\Local\EasyCopyTracker`.
 > The exact path is printed at startup in the log and shown at the bottom of the sidebar.
 
 ## Known limitations
 
 - **Windows only** — the capture layer is Win32.
 - **The active list is volatile by design.** Archive anything you want to keep.
-- **Port 8765 is hardcoded.** If another app holds it, CopyTracker refuses to start
+- **Port 8765 is hardcoded.** If another app holds it, Easy Copy Tracker refuses to start
   and says so in the log.
 - **Single instance** — starting it again just opens the existing UI.
 - The global hotkeys silently fall back if another app already owns them (logged).

@@ -1,6 +1,6 @@
 ﻿# -*- coding: utf-8 -*-
 """
-CopyTracker v3 — Pano gelen kutusu / link triage aracı.
+Easy Copy Tracker — Pano gelen kutusu / link triage aracı.
 
 Mimari:
   - Aktif liste RAM'de tutulur (geçici; uygulama kapanınca gider).
@@ -9,7 +9,7 @@ Mimari:
   - Çökmeye karşı oturum gölgesi (session_backup.json) tutulur; temiz kapanışta silinir.
 
 Kullanım:
-    python copytracker.py     konsolda çalıştırır
+    python easycopytracker.py     konsolda çalıştırır
     start.bat                 arka planda başlatır + tarayıcıda listeyi açar
     stop.bat / tepsi → Çıkış  durdurur
 
@@ -36,7 +36,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 def _data_dir():
-    """Kişisel veriler %LOCALAPPDATA%\\CopyTracker altında tutulur.
+    """Kişisel veriler %LOCALAPPDATA%\\EasyCopyTracker altında tutulur.
 
     Uygulama klasörü (ör. C:\\) diğer yerel hesaplara okuma/yazma izni veren bir
     ACL devralabiliyor; kullanıcı profili altındaki dizin varsayılan olarak
@@ -45,7 +45,7 @@ def _data_dir():
     """
     base = os.environ.get("LOCALAPPDATA")
     if base:
-        d = os.path.join(base, "CopyTracker")
+        d = os.path.join(base, "EasyCopyTracker")
         try:
             os.makedirs(d, exist_ok=True)
             return d
@@ -60,13 +60,13 @@ ARCHIVE_FILE = os.path.join(DATA_DIR, "archive.json")
 BACKUP_FILE = os.path.join(DATA_DIR, "session_backup.json")
 RECOVERY_FILE = os.path.join(DATA_DIR, "recovery_pending.json")
 LEGACY_FILE = os.path.join(BASE_DIR, "data.json")
-LOG_FILE = os.path.join(DATA_DIR, "copytracker.log")
-PID_FILE = os.path.join(DATA_DIR, "copytracker.pid")
-ICON_FILE = os.path.join(BASE_DIR, "docs", "copytracker.ico")
+LOG_FILE = os.path.join(DATA_DIR, "easycopytracker.log")
+PID_FILE = os.path.join(DATA_DIR, "easycopytracker.pid")
+ICON_FILE = os.path.join(BASE_DIR, "docs", "easycopytracker.ico")
 HOST = "127.0.0.1"
 PORT = 8765
 URL = f"http://localhost:{PORT}"
-APP_NAME = "CopyTracker"
+APP_NAME = "Easy Copy Tracker"
 DEDUP_WINDOW = 1.5   # sn — aynı içeriğin peş peşe yinelenen pano olaylarını eler
 MAX_TEXT = 10000     # kaydedilecek azami karakter sayısı
 MAX_ITEMS = 2000     # aktif listedeki azami öğe (aşılınca en eski sabitlenmemiş atılır)
@@ -301,12 +301,40 @@ def load_archive():
     _archive = {"next_aid": next_aid, "items": items}
 
 
+def migrate_from_old_name():
+    """Uygulama "CopyTracker" adıyla kurulmuşsa verisini yeni klasöre taşır."""
+    base = os.environ.get("LOCALAPPDATA")
+    if not base or DATA_DIR == BASE_DIR:
+        return
+    old = os.path.join(base, "CopyTracker")
+    if not os.path.isdir(old) or os.path.abspath(old) == os.path.abspath(DATA_DIR):
+        return
+    moved = 0
+    for name in os.listdir(old):
+        src = os.path.join(old, name)
+        # log/pid dosyaları yeni adla devam etsin
+        dst = os.path.join(DATA_DIR, "easy" + name if name.startswith("copytracker.") else name)
+        if os.path.exists(dst):
+            continue
+        try:
+            os.replace(src, dst)
+            moved += 1
+        except OSError as e:
+            log(f"{name} taşınamadı: {e}")
+    if moved:
+        log(f"Eski CopyTracker klasöründen {moved} dosya taşındı → {DATA_DIR}")
+    try:
+        os.rmdir(old)
+    except OSError:
+        pass
+
+
 def migrate_data_dir():
     """v3.0'da uygulama klasöründe kalan verileri %LOCALAPPDATA%'ya taşır."""
     if DATA_DIR == BASE_DIR:
         return
     for name in ("settings.json", "archive.json", "session_backup.json",
-                 "recovery_pending.json", "copytracker.log"):
+                 "recovery_pending.json", "easycopytracker.log"):
         old = os.path.join(BASE_DIR, name)
         new = os.path.join(DATA_DIR, name)
         if os.path.exists(old) and not os.path.exists(new):
@@ -518,7 +546,7 @@ def _fetch_title(item_id, url):
             return  # iç ağ / loopback adresi — istek atma
         opener = urllib_request.build_opener(_SafeRedirect)
         req = urllib_request.Request(url, headers={
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) CopyTracker/3.0"})
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) EasyCopyTracker/3.0"})
         with opener.open(req, timeout=6) as r:
             raw = r.read(131072)
         m = re.search(rb"<title[^>]*>(.*?)</title>", raw, re.IGNORECASE | re.DOTALL)
@@ -780,12 +808,12 @@ def purge_archive():
 # ------------------------------------------------- Windows'la birlikte başlatma
 
 RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
-RUN_NAME = "CopyTracker"
+RUN_NAME = "EasyCopyTracker"
 
 
 def _startup_command():
     """Açılışta çalıştırılacak komut — konsolsuz pythonw tercih edilir."""
-    script = os.path.join(BASE_DIR, "copytracker.py")
+    script = os.path.join(BASE_DIR, "easycopytracker.py")
     exe = sys.executable or "python.exe"
     pythonw = os.path.join(os.path.dirname(exe), "pythonw.exe")
     if os.path.exists(pythonw):
@@ -803,8 +831,23 @@ def get_startup():
         return False
 
 
+def _drop_legacy_startup():
+    """Eski "CopyTracker" adıyla yazılmış açılış kaydını temizler (çift başlamasın)."""
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY, 0, winreg.KEY_SET_VALUE) as k:
+            try:
+                winreg.DeleteValue(k, "CopyTracker")
+                log("Eski açılış kaydı (CopyTracker) kaldırıldı.")
+            except FileNotFoundError:
+                pass
+    except OSError:
+        pass
+
+
 def set_startup(enabled):
     """Kayıt defterindeki Run anahtarını günceller. Hata mesajını döndürür (yoksa None)."""
+    _drop_legacy_startup()
     try:
         import winreg
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY, 0, winreg.KEY_SET_VALUE) as k:
@@ -1202,7 +1245,7 @@ _tray_data = None
 
 
 def _app_icon(size=0):
-    """docs/copytracker.ico'yu yükler; bulunamazsa Windows varsayılanına düşer.
+    """docs/easycopytracker.ico'yu yükler; bulunamazsa Windows varsayılanına düşer.
 
     size=0 → sistem tepsi için uygun küçük boyutu ikondan kendisi seçer.
     """
@@ -1224,7 +1267,7 @@ def _tray_add(hwnd):
     nid.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP
     nid.uCallbackMessage = WM_TRAY
     nid.hIcon = _app_icon(user32.GetSystemMetrics(SM_CXSMICON))
-    nid.szTip = "CopyTracker — pano gelen kutusu"
+    nid.szTip = "Easy Copy Tracker — pano gelen kutusu"
     if shell32.Shell_NotifyIconW(NIM_ADD, ctypes.byref(nid)):
         _tray_data = nid
     else:
@@ -1293,7 +1336,7 @@ def run_listener():
     wc = WNDCLASSW()
     wc.lpfnWndProc = _wnd_proc_ref
     wc.hInstance = kernel32.GetModuleHandleW(None)
-    wc.lpszClassName = "CopyTrackerListener"
+    wc.lpszClassName = "EasyCopyTrackerListener"
     if not user32.RegisterClassW(ctypes.byref(wc)):
         raise ctypes.WinError(ctypes.get_last_error())
     # Tepsi geri çağrıları mesaj-only pencerelere gelmediği için normal gizli pencere
@@ -1345,7 +1388,7 @@ def request_guard():
     if (request.host or "").lower() not in ALLOWED_HOSTS:
         return jsonify({"ok": False, "error": "geçersiz host"}), 403
     if request.method == "POST":
-        if request.headers.get("X-CopyTracker") != "1":
+        if request.headers.get("X-EasyCopyTracker") != "1":
             return jsonify({"ok": False, "error": "geçersiz istek"}), 403
         origin = request.headers.get("Origin")
         if origin and origin not in ALLOWED_ORIGINS:
@@ -1725,7 +1768,7 @@ def maintenance_thread():
 
 # ---------------------------------------------------------------------- main
 
-def _copytracker_on_port():
+def _easycopytracker_on_port():
     try:
         import urllib.request
         with urllib.request.urlopen(f"http://{HOST}:{PORT}/api/items", timeout=2) as r:
@@ -1741,17 +1784,19 @@ def main():
         probe.bind((HOST, PORT))
     except OSError:
         probe.close()
-        if _copytracker_on_port():
-            log("CopyTracker zaten çalışıyor — tarayıcıda liste açılıyor.")
+        if _easycopytracker_on_port():
+            log("Easy Copy Tracker zaten çalışıyor — tarayıcıda liste açılıyor.")
             webbrowser.open(URL)
         else:
             log(f"HATA: {PORT} portu başka bir uygulama tarafından kullanılıyor; "
-                f"CopyTracker başlatılamadı. O uygulamayı kapatıp yeniden deneyin.")
+                f"Easy Copy Tracker başlatılamadı. O uygulamayı kapatıp yeniden deneyin.")
         return
     probe.close()
 
     global _title_pool
+    migrate_from_old_name()
     migrate_data_dir()
+    _drop_legacy_startup()
     try:  # bozuk/kurcalanmış bir dosya uygulamayı kalıcı olarak açılmaz yapmasın
         migrate_legacy()
         if not load_settings():
@@ -1781,11 +1826,11 @@ def main():
     threading.Thread(target=toast_thread, daemon=True).start()
     threading.Thread(target=maintenance_thread, daemon=True).start()
     threading.Thread(target=backup_thread, daemon=True).start()
-    log(f"CopyTracker v3 başladı. Web arayüzü: {URL}  (aktif liste RAM'de, arşiv diskte)")
+    log(f"Easy Copy Tracker v3 başladı. Web arayüzü: {URL}  (aktif liste RAM'de, arşiv diskte)")
     log(f"Veri klasörü: {DATA_DIR}")
     if not HAS_QR:
         log("Not: 'qrcode' paketi yok — QR özelliği kapalı (pip install qrcode).")
-    notify("📋 CopyTracker başladı", f"Kopyaladığın her şey listeye düşecek. Liste: {URL}")
+    notify("📋 Easy Copy Tracker başladı", f"Kopyaladığın her şey listeye düşecek. Liste: {URL}")
     if "--open" in sys.argv:
         webbrowser.open(URL)
 
@@ -1805,7 +1850,7 @@ def main():
             os.remove(PID_FILE)
         except OSError:
             pass
-        log("CopyTracker durdu.")
+        log("Easy Copy Tracker durdu.")
 
 
 if __name__ == "__main__":

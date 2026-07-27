@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>CopyTracker — Kopyalananlar</title>
+<title>Easy Copy Tracker — Kopyalananlar</title>
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%2312070d'/><rect x='12' y='16.5' width='40' height='7' rx='3.5' fill='%23ff2d6f'/><rect x='12' y='28.5' width='28' height='7' rx='3.5' fill='%23ff5c8a' opacity='.72'/><rect x='12' y='40.5' width='34' height='7' rx='3.5' fill='%23ffa8c0' opacity='.44'/></svg>">
 <style>
@@ -230,7 +230,7 @@ body.selecting .actions{display:none}
         <rect x="12" y="16.5" width="40" height="7" rx="3.5" fill="#ff2d6f"/>
         <rect x="12" y="28.5" width="28" height="7" rx="3.5" fill="#ff5c8a" opacity=".72"/>
         <rect x="12" y="40.5" width="34" height="7" rx="3.5" fill="#ffa8c0" opacity=".44"/>
-      </svg>CopyTracker
+      </svg>Easy Copy Tracker
       <button id="themeBtn" title="Açık / koyu tema">🌙</button>
     </div>
 
@@ -265,7 +265,7 @@ body.selecting .actions{display:none}
     <nav class="settings">
       <h3>⚙ Ayarlar</h3>
 
-      <div class="setrow" id="startupRow" title="Windows açılışında CopyTracker'ı arka planda başlatır">
+      <div class="setrow" id="startupRow" title="Windows açılışında Easy Copy Tracker'ı arka planda başlatır">
         <span class="setlbl">🚀 Windows açılışında başlat</span>
         <span class="mini"><span class="track"></span></span>
       </div>
@@ -332,7 +332,7 @@ body.selecting .actions{display:none}
 
     <div class="progress" id="progressWrap"><i id="bar"></i></div>
 
-    <div id="offline">⚠️ Uygulamaya ulaşılamıyor — CopyTracker kapalı görünüyor. <code>start.bat</code> ile yeniden başlatın.</div>
+    <div id="offline">⚠️ Uygulamaya ulaşılamıyor — Easy Copy Tracker kapalı görünüyor. <code>start.bat</code> ile yeniden başlatın.</div>
 
     <div id="listView">
       <section>
@@ -379,11 +379,11 @@ const state = {
   armedCollection: null, armedUntil: 0
 };
 const ARM_MS = 5000;  // onay penceresi — 2,5 sn gerçek kullanımda çok kısaydı
-const HDRS = {"Content-Type": "application/json", "X-CopyTracker": "1"};
+const HDRS = {"Content-Type": "application/json", "X-EasyCopyTracker": "1"};
 
 /* ---------------- tema (açık / koyu) ---------------- */
 (function(){
-  const KEY = "copytracker-theme";
+  const KEY = "easycopytracker-theme";
   const btn = document.getElementById("themeBtn");
   const sysDark = window.matchMedia("(prefers-color-scheme: dark)");
   function apply(theme){
@@ -1034,7 +1034,7 @@ document.getElementById("downloadBtn").addEventListener("click", function(){
   const n = new Date();  // yerel saat — uygulamanın geri kalanıyla tutarlı olsun
   const stamp = pad(n.getDate()) + "." + pad(n.getMonth()+1) + "." + n.getFullYear() +
     " " + pad(n.getHours()) + ":" + pad(n.getMinutes());
-  let out = "# CopyTracker — " + col + " — " + stamp + "\n\n";
+  let out = "# Easy Copy Tracker — " + col + " — " + stamp + "\n\n";
   out += "## Bekleyenler (" + pend.length + ")\n";
   pend.forEach(function(i){ out += "- [ ] " + (i.title ? i.title + " — " : "") + i.text + "\n"; });
   out += "\n## Tamamlananlar (" + done.length + ")\n";
@@ -1042,7 +1042,7 @@ document.getElementById("downloadBtn").addEventListener("click", function(){
   const blob = new Blob([out], {type:"text/plain;charset=utf-8"});
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = "copytracker-" + col.replace(/\s+/g,"_") + "-" + dayKeyOf(new Date()) + ".txt";
+  a.download = "easycopytracker-" + col.replace(/\s+/g,"_") + "-" + dayKeyOf(new Date()) + ".txt";
   a.click();
   setTimeout(function(){ URL.revokeObjectURL(a.href); }, 3000);
 });

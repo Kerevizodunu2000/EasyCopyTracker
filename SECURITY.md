@@ -1,19 +1,19 @@
-# Security Policy
+﻿# Security Policy
 
 ## Reporting a vulnerability
 
 Please **do not** open a public issue for security problems.
 
-Report privately through GitHub's [private vulnerability reporting](https://docs.github.com/en/code-security/security-advisories/guidance-on-reporting-and-writing-information-about-vulnerabilities/privately-reporting-a-security-vulnerability)
-(Security tab → *Report a vulnerability*), or email the maintainer directly at
-**halilsafaksimsek@gmail.com**.
+Report privately through
+[GitHub's private vulnerability reporting](https://github.com/Kerevizodunu2000/EasyCopyTracker/security/advisories/new),
+or email the maintainer directly at **halilsafaksimsek@gmail.com**.
 
 Please include: what you did, what happened, and what an attacker gains. A proof of
 concept helps a lot. Expect an initial response within a few days.
 
 ## Scope
 
-CopyTracker runs entirely on the local machine and binds only to `127.0.0.1:8765`.
+Easy Copy Tracker runs entirely on the local machine and binds only to `127.0.0.1:8765`.
 It has no authentication by design — the trust boundary is the local user account.
 
 **In scope**
@@ -38,6 +38,6 @@ It has no authentication by design — the trust boundary is the local user acco
 
 ## Handling your own data
 
-`settings.json`, `archive.json`, `session_backup.json` and `copytracker.log` contain
+`settings.json`, `archive.json`, `session_backup.json` and `easycopytracker.log` contain
 clipboard contents. They are gitignored — never attach them to a public issue.
 Redact before sharing.

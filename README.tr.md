@@ -1,6 +1,6 @@
-<img src="docs/icon.svg" alt="" width="72" align="left" hspace="14" vspace="4">
+﻿<img src="docs/icon.svg" alt="" width="72" align="left" hspace="14" vspace="4">
 
-# CopyTracker
+# Easy Copy Tracker
 
 > English documentation: [README.md](README.md)
 
@@ -8,11 +8,9 @@ Pano gelen kutusu / link triage aracı: Kopyaladığın **her şeyi** (Ctrl+C) a
 yakalar, sağ altta bildirim gösterir ve web arayüzünde to-do listesi gibi
 işlemeni sağlar. Linke tıkla → açılır → ✓ işaretlenir → aşağı düşer.
 
-![CopyTracker ekran görüntüsü](docs/screenshot.png)
-
 ## Bu proje neden var?
 
-CopyTracker'ı kendi kısa ve somut bir işimi halletmek için yazdım: onlarca link
+Easy Copy Tracker'ı kendi kısa ve somut bir işimi halletmek için yazdım: onlarca link
 kopyalıyor, hangisini açtığımı kaybediyor ve hepsini tek tek işleyebileceğim bir
 kuyruk istiyordum.
 
@@ -22,7 +20,12 @@ Paylaşmaya değecek kadar işe yaradı. **Ticari bir ürün değil ve bir yol h
 
 ## Kurulum
 
-**En kolayı:** **`kurulum.bat`** dosyasına çift tıkla. Python'u kontrol eder, iki
+```bat
+git clone https://github.com/Kerevizodunu2000/EasyCopyTracker.git
+cd EasyCopyTracker
+```
+
+Sonra **`kurulum.bat`** dosyasına çift tıkla. Python'u kontrol eder, iki
 bağımlılığı kurar, masaüstüne kısayol ekler ve uygulamayı başlatır.
 
 Elle yapmak istersen:
@@ -41,7 +44,7 @@ ve kurulumda **"Add python.exe to PATH"** kutusunu işaretle.
 | Ne | Nasıl |
 |---|---|
 | Arka planda başlat + listeyi aç | `start.bat` ya da masaüstü kısayolu |
-| Konsolda çalıştır (logları gör) | `python copytracker.py` |
+| Konsolda çalıştır (logları gör) | `python easycopytracker.py` |
 | Durdur | Tepsi simgesi → **Çıkış** ya da `stop.bat` |
 
 Web arayüzü: **http://localhost:8765** · Tepsi simgesi: sağ tık → menü
@@ -50,7 +53,7 @@ Web arayüzü: **http://localhost:8765** · Tepsi simgesi: sağ tık → menü
 
 ## Veriler nerede durur?
 
-Kişisel veriler proje klasöründe değil, **`%LOCALAPPDATA%\CopyTracker`** altında tutulur:
+Kişisel veriler proje klasöründe değil, **`%LOCALAPPDATA%\EasyCopyTracker`** altında tutulur:
 
 | Veri | Dosya | Davranış |
 |---|---|---|
@@ -61,7 +64,7 @@ Kişisel veriler proje klasöründe değil, **`%LOCALAPPDATA%\CopyTracker`** alt
 
 > **Microsoft Store Python kullanıyorsan:** Store sürümü `%LOCALAPPDATA%`'yı
 > sanallaştırır, gerçek klasör
-> `%LOCALAPPDATA%\Packages\PythonSoftwareFoundation.Python.<sürüm>\LocalCache\Local\CopyTracker`
+> `%LOCALAPPDATA%\Packages\PythonSoftwareFoundation.Python.<sürüm>\LocalCache\Local\EasyCopyTracker`
 > olur. Kesin yol kenar çubuğunun altında ve açılışta log'da yazar.
 
 **Arşiv saklama süresi** (Ayarlar'dan): 1 saat · 1 gün · Gün sonu · **1 ay
@@ -92,7 +95,7 @@ Kişisel veriler proje klasöründe değil, **`%LOCALAPPDATA%\CopyTracker`** alt
 
 - **Sadece Windows** — yakalama katmanı Win32.
 - **Aktif liste bilinçli olarak uçucudur.** Saklamak istediğini arşivle.
-- **8765 portu sabittir**; başka uygulama tutuyorsa CopyTracker başlamaz ve log'a yazar.
+- **8765 portu sabittir**; başka uygulama tutuyorsa Easy Copy Tracker başlamaz ve log'a yazar.
 - Tek örnek çalışır; yeniden başlatmak sadece mevcut arayüzü açar.
 - Global kısayollar başka uygulama tarafından tutuluyorsa sessizce devre dışı kalır (log'a yazılır).
 - Arayüz şimdilik yalnızca Türkçe.
