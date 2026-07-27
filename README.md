@@ -13,7 +13,7 @@ list: click a link → it opens → gets checked off → drops to "Done".
 Think of it as the missing bridge between clipboard managers (Ditto, CopyQ) and
 read-later apps (Instapaper, Wallabag): automatic capture **and** a triage workflow.
 
-*The interface is in Turkish. English localization contributions are welcome.*
+![Easy Copy Tracker](docs/screenshot.png)
 
 ## Why this exists
 
@@ -33,7 +33,7 @@ git clone https://github.com/Kerevizodunu2000/EasyCopyTracker.git
 cd EasyCopyTracker
 ```
 
-Then double-click **`kurulum.bat`** (setup). It checks Python, installs the two
+Then double-click **`install.bat`**. It checks Python, installs the two
 dependencies, creates a desktop shortcut, and starts the app.
 
 Prefer doing it manually?
@@ -51,7 +51,7 @@ and tick **"Add python.exe to PATH"** during setup.
 |---|---|
 | Start in the background + open the list | `start.bat` or the desktop shortcut |
 | Run with console logs | `python easycopytracker.py` |
-| Stop | tray icon → **Çıkış** (Quit), or `stop.bat` |
+| Stop | tray icon → **Quit**, or `stop.bat` |
 | Web UI | http://localhost:8765 |
 
 **Shortcuts:** `Ctrl+Alt+K` toggle capture · `Ctrl+Alt+L` open the list
@@ -115,7 +115,6 @@ Personal data is stored in `%LOCALAPPDATA%\EasyCopyTracker`:
   and says so in the log.
 - **Single instance** — starting it again just opens the existing UI.
 - The global hotkeys silently fall back if another app already owns them (logged).
-- The UI is **Turkish only** for now.
 - Runs on Flask's development server. That is fine here because it is bound to
   loopback and single-user, but do not expose it to a network.
 - Non-text clipboard content (files, images) is intentionally not captured.
@@ -125,10 +124,6 @@ Personal data is stored in `%LOCALAPPDATA%\EasyCopyTracker`:
 Issues and pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
 Since this started as a personal utility, expect a small scope and slow but genuine
 responses. Feedback by email works too: **halilsafaksimsek@gmail.com**
-
-## Documentation in Turkish
-
-Türkçe belgeler için: [README.tr.md](README.tr.md)
 
 ## License
 

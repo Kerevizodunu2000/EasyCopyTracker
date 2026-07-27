@@ -1,18 +1,18 @@
 ﻿"""
-Easy Copy Tracker — Pano gelen kutusu / link triage aracı.
+Easy Copy Tracker — clipboard inbox / link triage tool.
 
-Mimari:
-  - Aktif liste RAM'de tutulur (geçici; uygulama kapanınca gider).
-  - Arşiv diske yazılır (archive.json) ve ayarlanan süre sonunda otomatik silinir.
-  - Ayarlar + koleksiyonlar settings.json'da kalıcıdır.
-  - Çökmeye karşı oturum gölgesi (session_backup.json) tutulur; temiz kapanışta silinir.
+Architecture:
+  - The active list is held in RAM (volatile; gone once the app exits).
+  - The archive is written to disk (archive.json) and auto-purged per retention.
+  - Settings + collections persist in settings.json.
+  - A crash shadow (session_backup.json) is kept; removed on a clean shutdown.
 
-Kullanım:
-    python easycopytracker.py     konsolda çalıştırır
-    start.bat                 arka planda başlatır + tarayıcıda listeyi açar
-    stop.bat / tepsi → Çıkış  durdurur
+Usage:
+    python easycopytracker.py   run it in the console
+    start.bat                   start in the background + open the list
+    stop.bat / tray -> Quit     stop it
 
-Kısayollar: Ctrl+Alt+K yakalamayı aç/kapat · Ctrl+Alt+L listeyi aç
+Shortcuts: Ctrl+Alt+K toggle capture - Ctrl+Alt+L open the list
 """
 
 import ctypes
@@ -35,12 +35,12 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 def _data_dir():
-    """Kişisel veriler %LOCALAPPDATA%\\EasyCopyTracker altında tutulur.
+    """Personal data lives under %LOCALAPPDATA%\\EasyCopyTracker.
 
-    Uygulama klasörü (ör. C:\\) diğer yerel hesaplara okuma/yazma izni veren bir
-    ACL devralabiliyor; kullanıcı profili altındaki dizin varsayılan olarak
-    sadece o kullanıcıya açıktır. Ayrıca depoya yanlışlıkla commit'leme riskini
-    tamamen ortadan kaldırır.
+    An application folder (e.g. C:\\) can inherit an ACL that grants other local
+    accounts read/write access, while a directory under the user profile is by
+    default open only to that user. It also removes any risk of accidentally
+    committing personal data to the repository.
     """
     base = os.environ.get("LOCALAPPDATA")
     if base:
@@ -66,15 +66,17 @@ HOST = "127.0.0.1"
 PORT = 8765
 URL = f"http://localhost:{PORT}"
 APP_NAME = "Easy Copy Tracker"
-DEDUP_WINDOW = 1.5   # sn — aynı içeriğin peş peşe yinelenen pano olaylarını eler
-MAX_TEXT = 10000     # kaydedilecek azami karakter sayısı
-MAX_ITEMS = 2000     # aktif listedeki azami öğe (aşılınca en eski sabitlenmemiş atılır)
-BACKUP_INTERVAL = 2.0  # sn — gölge kopyanın azami yazma sıklığı
+DEDUP_WINDOW = 1.5   # s — collapses repeated clipboard events for the same content
+MAX_TEXT = 10000     # maximum number of characters stored per item
+MAX_ITEMS = 2000     # max items in the active list (oldest unpinned one is dropped)
+BACKUP_INTERVAL = 2.0  # s — how often the crash shadow may be written at most
+MAX_COLLECTIONS = 100      # ceiling for collections, incl. ones read from disk
+MAX_COLLECTION_NAME = 40   # characters
 FILTER_MODES = ("all", "links", "instagram", "custom")
 RETENTIONS = ("1h", "1d", "eod", "1m", "forever")
 RETENTION_SECS = {"1h": 3600, "1d": 86400, "1m": 30 * 86400}
 
-# pythonw ile (konsolsuz) çalışırken stdout/stderr None olur → log dosyasına yönlendir
+# Under pythonw (no console) stdout/stderr are None -> route them to the log file
 _STDOUT_IS_LOG = sys.stdout is None
 if sys.stdout is None:
     sys.stdout = open(LOG_FILE, "a", encoding="utf-8", buffering=1)
@@ -88,7 +90,7 @@ except Exception:
 try:
     from flask import Flask, Response, jsonify, request, send_file
 except ImportError:
-    print("Flask kurulu değil. Şunu çalıştırın:  pip install -r requirements.txt")
+    print("Flask is not installed. Run:  pip install -r requirements.txt")
     sys.exit(1)
 
 try:
@@ -99,11 +101,34 @@ except ImportError:
     HAS_QR = False
 
 
-# ---------------------------------------------------------------- yardımcılar
+# -------------------------------------------------------------------- helpers
+
+_rate_lock = threading.Lock()
+_rate_state = {}
+
+
+def rate_limited(key, limit, window):
+    """True once `key` has already fired `limit` times within `window` seconds.
+
+    A web page the user has focused may call navigator.clipboard.writeText() in
+    a loop — Chromium grants that without a prompt. Anything that draws an
+    always-on-top window or appends to the log therefore has to be bounded, or
+    a single visited page can blanket the desktop and grow the log for ever.
+    """
+    now = time.time()
+    with _rate_lock:
+        hits = [t for t in _rate_state.get(key, ()) if now - t < window]
+        if len(hits) >= limit:
+            _rate_state[key] = hits
+            return True
+        hits.append(now)
+        _rate_state[key] = hits
+        return False
+
 
 def log(msg):
     line = f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {msg}"
-    if not _STDOUT_IS_LOG:  # pythonw altında stdout zaten log dosyası — iki kez yazma
+    if not _STDOUT_IS_LOG:  # under pythonw stdout IS the log file — don't write twice
         try:
             print(line)
         except Exception:
@@ -139,13 +164,13 @@ def _read_json(path):
         return None
 
 
-# ---------------------------------------------------------------- durum
+# ---------------------------------------------------------------------- state
 
 _lock = threading.RLock()
-_started = now_iso()          # oturum başlangıcı (aktif liste bu oturuma ait)
-_items = []                   # AKTİF LİSTE — SADECE RAM
+_started = now_iso()          # session start (the active list belongs to this session)
+_items = []                   # ACTIVE LIST — RAM ONLY
 _next_id = 1
-_recovery = None              # çökmeden kurtarılmayı bekleyen öğeler
+_recovery = None              # items waiting to be recovered after a crash
 
 _settings = {
     "filter_mode": "all",
@@ -153,7 +178,7 @@ _settings = {
     "capture_enabled": True,
     "notifications_enabled": True,
     "retention": "1m",
-    "collections": [{"id": 1, "name": "Genel", "created_at": _started}],
+    "collections": [{"id": 1, "name": "General", "created_at": _started}],
     "active_collection": 1,
     "next_collection_id": 2,
 }
@@ -162,7 +187,7 @@ _archive = {"next_aid": 1, "items": []}
 
 
 class StorageError(Exception):
-    """Diske yazma başarısız — çağıran RAM değişikliğini geri almalı."""
+    """Writing to disk failed — the caller must roll back its RAM change."""
 
 
 def save_settings():
@@ -170,7 +195,7 @@ def save_settings():
         try:
             _write_json(SETTINGS_FILE, _settings)
         except OSError as e:
-            log(f"HATA: settings.json yazılamadı: {e}")
+            log(f"ERROR: could not write settings.json: {e}")
             raise StorageError(str(e)) from e
 
 
@@ -179,7 +204,7 @@ def save_archive():
         try:
             _write_json(ARCHIVE_FILE, _archive)
         except OSError as e:
-            log(f"HATA: archive.json yazılamadı: {e}")
+            log(f"ERROR: could not write archive.json: {e}")
             raise StorageError(str(e)) from e
 
 
@@ -187,10 +212,10 @@ _backup_dirty = threading.Event()
 
 
 def save_backup():
-    """Gölge kopyayı işaretler; asıl yazma backup_thread'de toplu yapılır.
+    """Marks the shadow copy dirty; the actual write is batched in backup_thread.
 
-    Her kopyada tüm listeyi diske yazmak O(n²) maliyet çıkarıyordu; bunun yerine
-    en fazla BACKUP_INTERVAL sn'de bir yazılır (çökmede en fazla o kadarı kaybolur).
+    Writing the whole list on every copy cost O(n^2); instead it is written at
+    most once every BACKUP_INTERVAL seconds (a crash loses at most that much).
     """
     _backup_dirty.set()
 
@@ -201,7 +226,7 @@ def _flush_backup():
     try:
         _write_json(BACKUP_FILE, snapshot)
     except OSError as e:
-        log(f"Gölge kopya yazılamadı: {e}")
+        log(f"Could not write the crash shadow: {e}")
 
 
 def backup_thread():
@@ -209,7 +234,7 @@ def backup_thread():
         _backup_dirty.wait()
         _backup_dirty.clear()
         _flush_backup()
-        time.sleep(BACKUP_INTERVAL)  # yazma sıklığını sınırla
+        time.sleep(BACKUP_INTERVAL)  # rate-limit the writes
 
 
 def delete_backup():
@@ -226,8 +251,13 @@ def load_settings():
         return False
     cols = [c for c in d.get("collections", []) if isinstance(c, dict)
             and isinstance(c.get("id"), int) and isinstance(c.get("name"), str)]
+    cols = cols[:MAX_COLLECTIONS]          # the API caps these; a hand-edited file might not
+    for c in cols:
+        c["name"] = c["name"][:MAX_COLLECTION_NAME]
+        if c["id"] == 1 and c["name"] == "Genel":
+            c["name"] = "General"          # earlier versions shipped a Turkish default name
     if not any(c["id"] == 1 for c in cols):
-        cols.insert(0, {"id": 1, "name": "Genel", "created_at": now_iso()})
+        cols.insert(0, {"id": 1, "name": "General", "created_at": now_iso()})
     max_cid = max(c["id"] for c in cols)
     next_cid = d.get("next_collection_id")
     if not isinstance(next_cid, int) or next_cid <= max_cid:
@@ -249,11 +279,11 @@ def load_settings():
 
 
 def _sanitize_entry(e, is_archive):
-    """Diskten okunan bir kaydı şemaya normalize eder; bozuksa None döner.
+    """Normalises an entry read from disk; returns None when it is malformed.
 
-    Diskteki dosyalar (başka bir yerel süreç tarafından) kurcalanmış olabilir;
-    özellikle `url` doğrudan arayüzde <a href> olarak kullanıldığından, kaydedilmiş
-    her URL yeniden as_web_link denetiminden geçirilir.
+    Files on disk may have been tampered with (by another local process), and
+    `url` is used directly as an <a href> in the UI, so every stored URL is put
+    through the as_web_link check again.
     """
     if not isinstance(e, dict) or not isinstance(e.get("text"), str):
         return None
@@ -272,7 +302,9 @@ def _sanitize_entry(e, is_archive):
         out["aid"] = aid if isinstance(aid, int) and aid > 0 else 0
         out["archived_at"] = out.get("archived_at") or now_iso()
         name = out.get("collection_name")
-        out["collection_name"] = name if isinstance(name, str) else "Genel"
+        if not isinstance(name, str) or name == "Genel":
+            name = "General"  # archived by an earlier build that shipped Turkish names
+        out["collection_name"] = name
     else:
         iid = out.get("id")
         out["id"] = iid if isinstance(iid, int) else 0
@@ -303,7 +335,7 @@ def load_archive():
 
 
 def migrate_from_old_name():
-    """Uygulama "CopyTracker" adıyla kurulmuşsa verisini yeni klasöre taşır."""
+    """Moves data over when the app was previously installed as "CopyTracker"."""
     base = os.environ.get("LOCALAPPDATA")
     if not base or DATA_DIR == BASE_DIR:
         return
@@ -313,7 +345,7 @@ def migrate_from_old_name():
     moved = 0
     for name in os.listdir(old):
         src = os.path.join(old, name)
-        # log/pid dosyaları yeni adla devam etsin
+        # log/pid files carry on under the new name
         dst = os.path.join(DATA_DIR, "easy" + name if name.startswith("copytracker.") else name)
         if os.path.exists(dst):
             continue
@@ -321,9 +353,9 @@ def migrate_from_old_name():
             os.replace(src, dst)
             moved += 1
         except OSError as e:
-            log(f"{name} taşınamadı: {e}")
+            log(f"Could not move {name}: {e}")
     if moved:
-        log(f"Eski CopyTracker klasöründen {moved} dosya taşındı → {DATA_DIR}")
+        log(f"Moved {moved} file(s) out of the old CopyTracker folder -> {DATA_DIR}")
     try:
         os.rmdir(old)
     except OSError:
@@ -331,7 +363,7 @@ def migrate_from_old_name():
 
 
 def migrate_data_dir():
-    """Eski sürümlerde uygulama klasöründe kalan verileri %LOCALAPPDATA%'ya taşır."""
+    """Moves data left in the app folder by older versions into %LOCALAPPDATA%."""
     if DATA_DIR == BASE_DIR:
         return
     for name in ("settings.json", "archive.json", "session_backup.json",
@@ -341,26 +373,27 @@ def migrate_data_dir():
         if os.path.exists(old) and not os.path.exists(new):
             try:
                 os.replace(old, new)
-                log(f"{name} → {DATA_DIR} taşındı.")
+                log(f"Moved {name} -> {DATA_DIR}")
             except OSError as e:
-                log(f"{name} taşınamadı: {e}")
+                log(f"Could not move {name}: {e}")
 
 
 def migrate_legacy():
-    """İlk açılışta eski data.json içeriğini kayıpsız arşive taşır."""
+    """On first run, moves the old data.json content into the archive intact."""
     if os.path.exists(SETTINGS_FILE) or not os.path.exists(LEGACY_FILE):
         return
     d = _read_json(LEGACY_FILE)
     if not isinstance(d, dict):
         return
-    cols = {c.get("id"): c.get("name", "Genel") for c in d.get("collections", [])
+    cols = {c.get("id"): c.get("name", "General") for c in d.get("collections", [])
             if isinstance(c, dict)}
     old_cols = [c for c in d.get("collections", []) if isinstance(c, dict)
                 and isinstance(c.get("id"), int) and isinstance(c.get("name"), str)]
     if old_cols:
         _settings["collections"] = old_cols
         if not any(c["id"] == 1 for c in old_cols):
-            _settings["collections"].insert(0, {"id": 1, "name": "Genel", "created_at": now_iso()})
+            _settings["collections"].insert(
+                0, {"id": 1, "name": "General", "created_at": now_iso()})
         _settings["next_collection_id"] = max(c["id"] for c in _settings["collections"]) + 1
     if d.get("filter_mode") in FILTER_MODES:
         _settings["filter_mode"] = d["filter_mode"]
@@ -377,7 +410,7 @@ def migrate_legacy():
             "copied_at": it.get("copied_at"),
             "checked": bool(it.get("checked")),
             "archived_at": now_iso(),
-            "collection_name": cols.get(it.get("collection"), "Genel"),
+            "collection_name": cols.get(it.get("collection"), "General"),
         })
         _archive["next_aid"] += 1
         moved += 1
@@ -386,15 +419,16 @@ def migrate_legacy():
     except OSError:
         pass
     if moved:
-        save_archive()  # taşınanlar hemen diske yazılsın — RAM'de kalırsa kaybolur
-        log(f"Eski data.json'dan {moved} öğe arşive taşındı (data.json.v2.bak yedeklendi).")
+        save_archive()  # persist right away — anything left in RAM would be lost
+        log(f"Moved {moved} item(s) from the old data.json into the archive "
+            "(backed up as data.json.v2.bak).")
 
 
 def check_recovery():
-    """Önceki oturum çökmüşse gölge kopyayı kurtarma adayı olarak bekletir.
+    """Holds the shadow copy as a recovery candidate when the last session crashed.
 
-    Kullanıcı bekleyen kurtarmaya karar vermeden ikinci bir çökme yaşanırsa eski
-    kayıtlar kaybolmasın diye iki dosya BİRLEŞTİRİLİR (üzerine yazılmaz).
+    If a second crash happens before the user decides about a pending recovery,
+    the two files are MERGED (never overwritten) so nothing is lost.
     """
     global _recovery
     pending = _read_json(RECOVERY_FILE) if os.path.exists(RECOVERY_FILE) else None
@@ -405,7 +439,7 @@ def check_recovery():
         if isinstance(src, dict) and isinstance(src.get("items"), list):
             merged.extend(x for x in (_sanitize_entry(e, False) for e in src["items"]) if x)
     seen, unique = set(), []
-    for it in merged:  # aynı metin iki dosyada varsa bir kez kurtarılsın
+    for it in merged:  # if the same text is in both files, recover it once
         key = (it["text"], it.get("collection"))
         if key not in seen:
             seen.add(key)
@@ -416,8 +450,8 @@ def check_recovery():
         try:
             _write_json(RECOVERY_FILE, {"items": unique, "saved_at": now_iso()})
         except OSError as e:
-            log(f"Kurtarma dosyası yazılamadı: {e}")
-        log(f"Önceki oturumdan {len(unique)} kurtarılabilir öğe bulundu.")
+            log(f"Could not write the recovery file: {e}")
+        log(f"Found {len(unique)} recoverable item(s) from the previous session.")
     else:
         try:
             os.remove(RECOVERY_FILE)
@@ -429,20 +463,20 @@ def check_recovery():
         pass
 
 
-# ---------------------------------------------------------------- link/filtre
+# -------------------------------------------------------------- links/filters
 
 def _host_of(url):
     try:
         netloc = urlparse(url).netloc
     except ValueError:
         return ""
-    # Tarayıcı '\' ve userinfo'yu otorite sonlandırıcı sayar; aynısını biz de yapalım
+    # Browsers treat '\' and userinfo as authority terminators; do the same here
     netloc = netloc.split("\\")[0].rsplit("@", 1)[-1]
     return netloc.split(":")[0].lower()
 
 
 def as_web_link(text):
-    """Metin gerçek/tam bir web sitesi linkiyse normalize URL döndürür, değilse None."""
+    """Returns a normalised URL when the text is a real, complete website link."""
     t = text.strip()
     if not t or any(ch.isspace() for ch in t):
         return None
@@ -455,8 +489,8 @@ def as_web_link(text):
         return None
     if p.scheme not in ("http", "https") or not p.netloc:
         return None
-    # Ters bölü ve userinfo, Python ile tarayıcı ayrıştırıcılarının farklı host
-    # bulmasına yol açar (evil.com\.instagram.com filtreyi kandırabilir) — reddet.
+    # Backslashes and userinfo make Python's and the browser's parsers disagree
+    # about the host (evil.com\.instagram.com could fool the filter) — reject them.
     if "\\" in candidate or "@" in p.netloc:
         return None
     host = p.netloc.split(":")[0]
@@ -479,7 +513,7 @@ def _host_matches(host, domain):
 
 
 def passes_filter(url):
-    """Aktif yakalama filtresine göre bu kopya kaydedilmeli mi?"""
+    """Should this copy be stored, given the active capture filter?"""
     mode = _settings["filter_mode"]
     if mode == "links":
         return url is not None
@@ -499,57 +533,142 @@ def collection_name(cid):
         for c in _settings["collections"]:
             if c["id"] == cid:
                 return c["name"]
-    return "Genel"
+    return "General"
 
 
-# ---------------------------------------------------------------- başlık çekme
+# ------------------------------------------------------------------ title fetch
 
-def _is_public_host(host):
-    """Host genel internete mi çözümleniyor? Loopback/özel/link-local ise False.
+TITLE_MAX_BYTES = 131072
+TITLE_SOCKET_TIMEOUT = 6      # s per socket operation
+TITLE_TOTAL_TIMEOUT = 15      # s wall clock for the whole fetch, redirects included
+TITLE_MAX_REDIRECTS = 3
+TITLE_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) EasyCopyTracker/1.0"
 
-    Başlık çekimi kullanıcının kopyaladığı URL'ye istek attığı için, kötü niyetli
-    bir sayfa panoya `http://10.0.0.1/...` yazdırıp iç ağ taraması yaptırabilir
-    (SSRF). Tüm çözümlenen adresleri denetleyip özel aralıkları reddediyoruz.
+
+def _public_address(host):
+    """Resolves `host` and returns ONE address — but only if every address it
+    resolves to is on the public internet. Returns None otherwise.
+
+    The title fetch sends a request to whatever URL the user copied, so a hostile
+    page could put `http://10.0.0.1/...` on the clipboard and have us scan the
+    internal network (SSRF). Returning the address (rather than a bool) lets the
+    caller connect to exactly what was validated — see _pinned_opener().
     """
     import ipaddress
     try:
         infos = socket.getaddrinfo(host, None)
     except (socket.gaierror, UnicodeError):
-        return False
+        return None
     if not infos:
-        return False
+        return None
+    chosen = None
     for info in infos:
         try:
             ip = ipaddress.ip_address(info[4][0])
         except ValueError:
-            return False
+            return None
         if not ip.is_global or ip.is_multicast:
-            return False
-    return True
+            return None
+        if chosen is None:
+            chosen = info[4][0]
+    return chosen
 
 
-class _SafeRedirect(urllib_request.HTTPRedirectHandler):
-    """Yönlendirmelerin de iç ağa sapmasını engeller."""
+class _NoRedirect(urllib_request.HTTPRedirectHandler):
+    """Refuses to follow redirects; _fetch_bounded() follows them by hand.
+
+    Letting urllib follow them would reuse this hop's pinned address for the
+    next host, and would skip the public-address check on the new target.
+    """
 
     def redirect_request(self, req, fp, code, msg, headers, newurl):
-        if as_web_link(newurl) is None or not _is_public_host(_host_of(newurl)):
+        return None
+
+
+def _pinned_opener(host, addr):
+    """An opener that connects ONLY to `addr`, whatever DNS says afterwards.
+
+    _public_address() resolves the name to validate it, and without pinning the
+    connection would resolve it a *second* time. An attacker who controls the
+    domain can answer the first lookup with a public address and the second with
+    an internal one (DNS rebinding), stepping straight past the check.
+    """
+    import http.client
+
+    class PinnedHTTP(http.client.HTTPConnection):
+        def connect(self):
+            self.sock = socket.create_connection((addr, self.port), self.timeout)
+
+    class PinnedHTTPS(http.client.HTTPSConnection):
+        def connect(self):
+            sock = socket.create_connection((addr, self.port), self.timeout)
+            # server_hostname stays the real name, so the certificate is still
+            # validated against the host the user actually copied.
+            self.sock = self._context.wrap_socket(sock, server_hostname=host)
+
+    class PinnedHTTPHandler(urllib_request.HTTPHandler):
+        def http_open(self, req):
+            return self.do_open(PinnedHTTP, req)
+
+    class PinnedHTTPSHandler(urllib_request.HTTPSHandler):
+        def https_open(self, req):
+            return self.do_open(PinnedHTTPS, req, context=self._context)
+
+    return urllib_request.build_opener(PinnedHTTPHandler, PinnedHTTPSHandler, _NoRedirect)
+
+
+def _read_until(resp, deadline):
+    """Reads at most TITLE_MAX_BYTES, giving up at `deadline`.
+
+    urllib's timeout is per socket operation, so a server that trickles a few
+    bytes every couple of seconds can hold a worker for ever. The pool only has
+    three workers, so three such URLs would kill the feature for the session.
+    """
+    buf = b""
+    while len(buf) < TITLE_MAX_BYTES and time.time() < deadline:
+        chunk = resp.read(min(16384, TITLE_MAX_BYTES - len(buf)))
+        if not chunk:
+            break
+        buf += chunk
+    return buf
+
+
+def _fetch_bounded(url):
+    """GETs `url` with every hop re-validated and pinned. Returns bytes or None."""
+    from urllib.error import HTTPError, URLError
+    from urllib.parse import urljoin
+    deadline = time.time() + TITLE_TOTAL_TIMEOUT
+    for _ in range(TITLE_MAX_REDIRECTS + 1):
+        if as_web_link(url) is None:
             return None
-        return super().redirect_request(req, fp, code, msg, headers, newurl)
+        addr = _public_address(_host_of(url))
+        if addr is None:
+            return None  # internal / loopback address — send nothing
+        req = urllib_request.Request(url, headers={"User-Agent": TITLE_UA})
+        try:
+            with _pinned_opener(_host_of(url), addr).open(
+                    req, timeout=TITLE_SOCKET_TIMEOUT) as r:
+                return _read_until(r, deadline)
+        except HTTPError as e:
+            location = e.headers.get("Location") if e.code in (301, 302, 303, 307, 308) else None
+            e.close()
+            if not location or time.time() > deadline:
+                return None
+            url = urljoin(url, location)
+        except (URLError, OSError, ValueError):
+            return None
+    return None
 
 
-_title_pool = None  # main() içinde kurulur — iş parçacığı sayısı sınırlı kalsın
+_title_pool = None  # created in main() — keeps the thread count bounded
 
 
 def _fetch_title(item_id, url):
-    """Link öğesi için sayfa başlığını arka planda çeker (best-effort)."""
+    """Fetches the page title for a link item in the background (best-effort)."""
     try:
-        if not _is_public_host(_host_of(url)):
-            return  # iç ağ / loopback adresi — istek atma
-        opener = urllib_request.build_opener(_SafeRedirect)
-        req = urllib_request.Request(url, headers={
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) EasyCopyTracker/1.0"})
-        with opener.open(req, timeout=6) as r:
-            raw = r.read(131072)
+        raw = _fetch_bounded(url)
+        if not raw:
+            return
         m = re.search(rb"<title[^>]*>(.*?)</title>", raw, re.IGNORECASE | re.DOTALL)
         if not m:
             return
@@ -573,10 +692,10 @@ def _fetch_title(item_id, url):
                     break
         save_backup()
     except Exception:
-        pass  # başlık süs; hata sessizce yutulur
+        pass  # the title is cosmetic; failures are swallowed
 
 
-# ---------------------------------------------------------------- öğe işlemleri
+# -------------------------------------------------------------- item operations
 
 _last_text = None
 _last_time = 0.0
@@ -585,18 +704,19 @@ _ignore_until = 0.0
 
 
 def suppress_next(text, secs=3.0):
-    """Bu metnin önümüzdeki birkaç saniyedeki pano olayını yok say (kendi kopyamız)."""
+    """Ignore this text on the clipboard for a few seconds (it is our own copy)."""
     global _ignore_text, _ignore_until
     _ignore_text = text
     _ignore_until = time.time() + secs
 
 
 def add_item(text):
-    """Kopyayı RAM listesine ekler.
+    """Adds a copy to the in-memory list.
 
-    Dönüş: ("new"|"dup", item) | ("skip"|"filtered", None)
-    "dup": aynı metin aktif koleksiyonda zaten var → yeni kayıt açılmaz,
-    kopya sayacı artar; tamamlanmışsa geri açılır (yeniden işlenecek demektir).
+    Returns: ("new"|"dup", item) | ("skip"|"filtered", None)
+    "dup": the same text is already in the active collection -> no new row is
+    created, the copy counter is bumped; a completed row is reopened (it means
+    the item is to be processed again).
     """
     global _last_text, _last_time, _next_id
     now = time.time()
@@ -607,7 +727,7 @@ def add_item(text):
     _last_time = now
 
     if len(text) > MAX_TEXT:
-        text = text[:MAX_TEXT] + "\n… (kırpıldı)"
+        text = text[:MAX_TEXT] + "\n… (truncated)"
     url = as_web_link(text)
     with _lock:
         if not passes_filter(url):
@@ -637,12 +757,14 @@ def add_item(text):
         }
         _next_id += 1
         _items.append(item)
-        if len(_items) > MAX_ITEMS:  # sınırsız büyümeyi engelle
+        if len(_items) > MAX_ITEMS:  # keep the list from growing without bound
             for i, old in enumerate(_items):
                 if not old.get("pinned"):
                     dropped = _items.pop(i)
-                    log(f"Liste sınırı ({MAX_ITEMS}) aşıldı; en eski öğe atıldı: "
-                        f"#{dropped['id']} {short(dropped['text'], 40)}")
+                    # No clipboard content here: the log may be shared or backed
+                    # up, and a flood of copies would dump the user's own items.
+                    log(f"List limit ({MAX_ITEMS}) exceeded; dropped the oldest item "
+                        f"#{dropped['id']} ({len(dropped['text'])} characters).")
                     break
     save_backup()
     if url and _title_pool is not None:
@@ -683,10 +805,10 @@ def delete_items(ids):
 
 
 def archive_items(ids):
-    """Öğeleri RAM'den diske (arşive) taşır.
+    """Moves items out of RAM and onto disk (the archive).
 
-    Diske yazma başarısız olursa TÜM değişiklik geri alınır — öğeler aktif
-    listede kalır; yarı yolda kaybolmaz.
+    If the disk write fails the WHOLE change is rolled back — the items stay in
+    the active list instead of vanishing halfway through.
     """
     idset = set(ids)
     moved = 0
@@ -717,7 +839,7 @@ def archive_items(ids):
             try:
                 save_archive()
             except StorageError:
-                _items[:] = prev_items  # geri al
+                _items[:] = prev_items  # roll back
                 _archive["items"] = prev_archive
                 _archive["next_aid"] = prev_next_aid
                 raise
@@ -726,7 +848,7 @@ def archive_items(ids):
 
 
 def clear_items(cid):
-    """Koleksiyonu temizler; sabitlenmiş (📌) öğelere dokunmaz."""
+    """Clears a collection; pinned (📌) items are left untouched."""
     with _lock:
         _items[:] = [it for it in _items
                      if it["collection"] != cid or it.get("pinned")]
@@ -745,7 +867,7 @@ def archive_delete(aids):
 
 
 def archive_restore(aids):
-    """Arşivdeki öğeleri aktif koleksiyona geri getirir."""
+    """Brings archived items back into the active collection."""
     global _next_id
     aidset = set(aids)
     restored = 0
@@ -778,7 +900,7 @@ def archive_restore(aids):
 
 
 def purge_archive():
-    """Saklama süresine göre arşivden otomatik siler."""
+    """Deletes archive entries automatically according to the retention rule."""
     r = _settings["retention"]
     if r == "forever":
         return 0
@@ -802,18 +924,18 @@ def purge_archive():
         if removed:
             save_archive()
     if removed:
-        log(f"Arşivden {removed} öğe süresi dolduğu için silindi (kural: {r}).")
+        log(f"Deleted {removed} expired item(s) from the archive (rule: {r}).")
     return removed
 
 
-# ------------------------------------------------- Windows'la birlikte başlatma
+# ------------------------------------------------------------ start with Windows
 
 RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 RUN_NAME = "EasyCopyTracker"
 
 
 def _startup_command():
-    """Açılışta çalıştırılacak komut — konsolsuz pythonw tercih edilir."""
+    """The command run at logon — the console-less pythonw is preferred."""
     script = os.path.join(BASE_DIR, "easycopytracker.py")
     exe = sys.executable or "python.exe"
     pythonw = os.path.join(os.path.dirname(exe), "pythonw.exe")
@@ -833,13 +955,13 @@ def get_startup():
 
 
 def _drop_legacy_startup():
-    """Eski "CopyTracker" adıyla yazılmış açılış kaydını temizler (çift başlamasın)."""
+    """Removes the startup entry left under the old "CopyTracker" name."""
     try:
         import winreg
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY, 0, winreg.KEY_SET_VALUE) as k:
             try:
                 winreg.DeleteValue(k, "CopyTracker")
-                log("Eski açılış kaydı (CopyTracker) kaldırıldı.")
+                log("Removed the old startup entry (CopyTracker).")
             except FileNotFoundError:
                 pass
     except OSError:
@@ -847,34 +969,34 @@ def _drop_legacy_startup():
 
 
 def set_startup(enabled):
-    """Kayıt defterindeki Run anahtarını günceller. Hata mesajını döndürür (yoksa None)."""
+    """Updates the registry Run key. Returns an error message, or None."""
     _drop_legacy_startup()
     try:
         import winreg
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY, 0, winreg.KEY_SET_VALUE) as k:
             if enabled:
                 winreg.SetValueEx(k, RUN_NAME, 0, winreg.REG_SZ, _startup_command())
-                log("Windows açılışında başlatma açıldı.")
+                log("Start with Windows enabled.")
             else:
                 try:
                     winreg.DeleteValue(k, RUN_NAME)
                 except FileNotFoundError:
                     pass
-                log("Windows açılışında başlatma kapatıldı.")
+                log("Start with Windows disabled.")
         return None
     except OSError as e:
-        log(f"Açılışta başlatma ayarlanamadı: {e}")
+        log(f"Could not change the start-with-Windows setting: {e}")
         return str(e)
 
 
 def announce_capture(enabled):
-    log("Yakalama " + ("açıldı." if enabled else "durduruldu."))
-    notify("📋 Yakalama " + ("açık" if enabled else "kapalı"),
-           "Kopyalananlar kaydediliyor." if enabled else "Kopyalananlar artık kaydedilmiyor.")
+    log("Capture " + ("started." if enabled else "stopped."))
+    notify("📋 Capture " + ("on" if enabled else "off"),
+           "Copies are being saved." if enabled else "Copies are no longer saved.")
 
 
 def set_capture(enabled):
-    """Tepsi menüsü / kısayol için: yakalamayı ayarlar, kaydeder ve bildirir."""
+    """For the tray menu / hotkey: sets capture, persists it and notifies."""
     with _lock:
         previous = _settings["capture_enabled"]
         _settings["capture_enabled"] = bool(enabled)
@@ -883,25 +1005,38 @@ def set_capture(enabled):
     except StorageError:
         with _lock:
             _settings["capture_enabled"] = previous
-        notify("⚠️ Ayar kaydedilemedi", "Yakalama durumu değiştirilemedi.")
+        notify("⚠️ Setting not saved", "The capture state could not be changed.")
         return
     announce_capture(enabled)
 
 
-# ---------------------------------------------------------------- bildirimler
-# Windows'un kendi toast bildirimleri kullanıcı ayarlarıyla kapatılabildiğinden
-# bildirimler uygulamanın kendi küçük penceresiyle gösterilir.
+# -------------------------------------------------------------- notifications
+# Windows' own toast notifications can be switched off in the user's settings,
+# so notifications are drawn in the app's own small window instead.
 
 _toasts = queue.Queue()
 TOAST_W, TOAST_H = 344, 96
 TOAST_SHOW_MS = 3200
 TOAST_MAX_AGE = 8.0
+TOAST_MAX_ON_SCREEN = 5
+TOAST_BURST, TOAST_BURST_WINDOW = 4, 3.0   # beyond this the toasts are summarised
+_toasts_hidden = 0
 
 
 def notify(title, msg, force=False):
-    """Bildirim gösterir. force=True olanlar (ayar bildirimleri) hep gösterilir."""
+    """Shows a notification. force=True ones (setting changes) always appear."""
+    global _toasts_hidden
     if not force and not _settings.get("notifications_enabled", True):
         return
+    if not force and rate_limited("toast", TOAST_BURST, TOAST_BURST_WINDOW):
+        # Copies are arriving faster than a person can make them. Summarise
+        # instead of stacking windows — see rate_limited() for why.
+        _toasts_hidden += 1
+        if rate_limited("toast_summary", 1, 5.0):
+            return
+        hidden, _toasts_hidden = _toasts_hidden, 0
+        title = f"📋 {hidden} more copies saved"
+        msg = "Copies are arriving very fast, so notifications are summarised."
     _toasts.put((title, msg, time.time()))
 
 
@@ -925,26 +1060,28 @@ _active_toasts = []
 
 
 def _show_toast(tk, root, title, msg):
-    """Kalıcı kök pencerenin altında tek bir bildirim (Toplevel) gösterir.
+    """Shows a single notification (a Toplevel) under the persistent root window.
 
-    Her bildirim için ayrı bir Tk() kökü açmak, iş parçacığı içinde tekrar
-    tekrar yapıldığında süreci sertçe düşürebiliyordu; tek kök + Toplevel
-    kullanımı Tk'nin desteklediği yol.
+    Opening a separate Tk() root per notification could hard-kill the process
+    when done over and over inside a thread; one root plus Toplevels is the
+    path Tk actually supports.
     """
+    if len(_active_toasts) >= TOAST_MAX_ON_SCREEN:
+        return  # hard ceiling, independent of the rate limit in notify()
     win = tk.Toplevel(root)
     win.withdraw()
     win.overrideredirect(True)
     win.attributes("-topmost", True)
     win.attributes("-alpha", 0.0)
 
-    slot = len(_active_toasts)            # üst üste binmesinler
+    slot = len(_active_toasts)            # keep them from stacking on top of each other
     _active_toasts.append(win)
     _, _, right, bottom = _work_area()
     y = bottom - TOAST_H - 16 - slot * (TOAST_H + 10)
     win.geometry(f"{TOAST_W}x{TOAST_H}+{right - TOAST_W - 16}+{y}")
 
     win.configure(bg="#1a0f15")
-    tk.Frame(win, bg="#ff2d6f", width=4).pack(side="left", fill="y")  # marka rengi
+    tk.Frame(win, bg="#ff2d6f", width=4).pack(side="left", fill="y")  # brand colour
     box = tk.Frame(win, bg="#1a0f15")
     box.pack(side="left", fill="both", expand=True, padx=14, pady=10)
     tk.Label(box, text=title, bg="#1a0f15", fg="#ffffff",
@@ -997,17 +1134,17 @@ def _show_toast(tk, root, title, msg):
 
 
 def toast_thread():
-    """Bildirimleri tek bir Tk kökü ve tek bir mesaj döngüsü üzerinden gösterir."""
+    """Draws notifications through a single Tk root and a single message loop."""
     try:
         import tkinter as tk
     except Exception as e:
-        log(f"tkinter bulunamadı, bildirimler devre dışı: {e}")
+        log(f"tkinter is unavailable, notifications disabled: {e}")
         return
     try:
         root = tk.Tk()
         root.withdraw()
     except Exception as e:
-        log(f"Bildirim penceresi kurulamadı, bildirimler devre dışı: {e}")
+        log(f"Could not create the notification window, notifications disabled: {e}")
         return
 
     def pump():
@@ -1019,17 +1156,17 @@ def toast_thread():
         except queue.Empty:
             pass
         except Exception as e:
-            log(f"Bildirim gösterilemedi: {e}")
+            log(f"Could not show a notification: {e}")
         root.after(150, pump)
 
     root.after(150, pump)
     try:
         root.mainloop()
     except Exception as e:
-        log(f"Bildirim döngüsü durdu: {e}")
+        log(f"The notification loop stopped: {e}")
 
 
-# ------------------------------------------------- Win32 (ctypes) tanımları
+# ------------------------------------------------- Win32 (ctypes) declarations
 
 CF_UNICODETEXT = 13
 WM_CLIPBOARDUPDATE = 0x031D
@@ -1186,11 +1323,11 @@ def _console_ctrl(event):
 _console_ctrl_ref = PHANDLER_ROUTINE(_console_ctrl)
 
 
-# ---------------------------------------------------------------- pano okuma
+# ------------------------------------------------------------ clipboard reading
 
 def read_clipboard():
-    """(durum, metin): 'ok'|'empty'|'excluded'|'no_text'|'error'."""
-    for _ in range(30):  # ~1,5 sn toplam bütçe
+    """(status, text): 'ok'|'empty'|'excluded'|'no_text'|'error'."""
+    for _ in range(30):  # ~1.5 s total budget
         if not user32.OpenClipboard(None):
             time.sleep(0.05)
             continue
@@ -1214,7 +1351,7 @@ def read_clipboard():
         finally:
             user32.CloseClipboard()
         time.sleep(0.05)
-    log("Pano ~1,5 sn boyunca okunamadı — bu kopya kaydedilemedi.")
+    log("The clipboard stayed locked for ~1.5 s — this copy could not be saved.")
     return "error", None
 
 
@@ -1223,16 +1360,16 @@ _last_nontext = 0.0
 _last_blind_warn = 0.0
 
 
-FILTER_LABEL = {"links": "Sadece linkler", "instagram": "Sadece Instagram",
-                "custom": "Özel alan adları"}
+FILTER_LABEL = {"links": "Links only", "instagram": "Instagram only",
+                "custom": "Custom domains"}
 
 
 def warn_filtered():
-    """Bir kopya filtreye takıldığında kullanıcıya sebebini söyler.
+    """Tells the user why a copy was dropped by the capture filter.
 
-    Filtre açıkken uygulama "hiç çalışmıyor" gibi görünüyordu: kopyalıyorsun,
-    hiçbir şey olmuyor, ekranda da bir açıklama yok. En fazla 30 sn'de bir
-    hatırlatma göster — sürekli kopyalarken rahatsız etmesin.
+    With a filter on, the app looked like it "just did not work": you copy,
+    nothing happens, and nothing on screen explains why. Show a reminder at most
+    once every 30 s so it does not nag while you copy repeatedly.
     """
     global _last_blind_warn
     now = time.time()
@@ -1243,11 +1380,12 @@ def warn_filtered():
         mode = _settings["filter_mode"]
         domains = [d for d in _settings["custom_domains"] if d.strip()]
     if mode == "custom" and not domains:
-        notify("⚠️ Hiçbir şey kaydedilmiyor",
-               "Filtre 'Özel alan adları' ama liste boş. Alan adı ekle ya da 'Tümü' seç.")
+        notify("⚠️ Nothing is being saved",
+               "The filter is 'Custom domains' but the list is empty. "
+               "Add a domain or pick 'Everything'.")
         return
-    notify(f"🚫 Filtre nedeniyle kaydedilmedi — {FILTER_LABEL.get(mode, mode)}",
-           "Her şeyin kaydedilmesi için soldaki filtreyi 'Tümü' yap.")
+    notify(f"🚫 Dropped by the capture filter — {FILTER_LABEL.get(mode, mode)}",
+           "Set the filter on the left to 'Everything' to save everything.")
 
 
 def clipboard_worker():
@@ -1256,61 +1394,68 @@ def clipboard_worker():
         _events.get()
         try:
             if not _settings["capture_enabled"]:
-                continue  # yakalama kapalı — olayı sessizce yut
+                continue  # capture is off — swallow the event quietly
             status, text = read_clipboard()
             if status == "ok":
                 if not text.strip():
                     continue
                 if (_ignore_text is not None and text == _ignore_text
                         and time.time() < _ignore_until):
-                    continue  # arayüzün "Kopyala" düğmesinden gelen kendi kopyamız
+                    continue  # our own copy, made by the UI's "Copy" button
                 kind, item = add_item(text)
                 if kind in ("skip", "filtered"):
                     if kind == "filtered":
-                        log(f"Filtre nedeniyle kaydedilmedi ({len(text)} karakter).")
+                        if not rate_limited("filter_log", 30, 10.0):
+                            log(f"Dropped by the capture filter ({len(text)} characters).")
                         warn_filtered()
                     continue
-                # Log'a pano İÇERİĞİ yazılmaz (log dosyası paylaşılabilir/yedeklenebilir);
-                # sadece sayısal üstveri tutulur. İçerik yalnızca ekrandaki bildirimde.
+                # Clipboard CONTENT never reaches the log (the log file may be
+                # shared or backed up); only numeric metadata is kept. The content
+                # appears solely in the on-screen notification. The log line is
+                # also rate limited so a scripted flood cannot grow the file.
                 col = collection_name(item["collection"])
-                where = f" → {col}" if col != "Genel" else ""
+                where = f" → {col}" if col != "General" else ""
+                quiet = rate_limited("capture_log", 30, 10.0)
                 if kind == "dup":
-                    log(f"#{item['id']} tekrar kopyalandı (×{item['copies']}).")
-                    notify("♻️ Zaten listede",
-                           f"Tekrar kopyalandı (×{item['copies']}): {short(text, 80)}")
+                    if not quiet:
+                        log(f"#{item['id']} copied again (×{item['copies']}).")
+                    notify("♻️ Already on the list",
+                           f"Copied again (×{item['copies']}): {short(text, 80)}")
                 elif item["is_link"]:
-                    log(f"#{item['id']} link kaydedildi ({col}, {_host_of(item['url'])})")
-                    notify("🔗 Web sitesi linki kopyalandı",
-                           f"Kaydedildi{where}: {short(item['url'])}")
+                    if not quiet:
+                        log(f"#{item['id']} link saved ({col}, {_host_of(item['url'])})")
+                    notify("🔗 Website link copied",
+                           f"Saved{where}: {short(item['url'])}")
                 else:
-                    log(f"#{item['id']} metin kaydedildi ({col}, {len(text)} karakter)")
-                    notify(f"📋 Kopyalandı ve kaydedildi{where}", short(text))
+                    if not quiet:
+                        log(f"#{item['id']} text saved ({col}, {len(text)} characters)")
+                    notify(f"📋 Copied and saved{where}", short(text))
             elif status == "no_text":
                 now = time.time()
                 if now - _last_nontext > DEDUP_WINDOW:
                     _last_nontext = now
-                    notify("📎 Kopyalandı (metin değil)", "Resim/dosya içerikleri kaydedilmez.")
+                    notify("📎 Copied (not text)", "Image and file contents are not saved.")
         except Exception as e:
-            log(f"Pano işleme hatası: {e}")
+            log(f"Clipboard processing error: {e}")
 
 
-# ------------------------------------------------- gizli pencere + tepsi + kısayol
+# --------------------------------------------- hidden window + tray + hotkeys
 
 _hwnd = None
 _tray_data = None
 
 
 def _app_icon(size=0):
-    """docs/easycopytracker.ico'yu yükler; bulunamazsa Windows varsayılanına düşer.
+    """Loads docs/easycopytracker.ico, falling back to the Windows default.
 
-    size=0 → sistem tepsi için uygun küçük boyutu ikondan kendisi seçer.
+    size=0 -> let Windows pick the small size suited to the notification area.
     """
     if os.path.exists(ICON_FILE):
         h = user32.LoadImageW(None, ICON_FILE, IMAGE_ICON, size, size,
                               LR_LOADFROMFILE | LR_DEFAULTSIZE)
         if h:
             return h
-        log("Uygulama ikonu yüklenemedi; varsayılan simge kullanılıyor.")
+        log("Could not load the app icon; using the default one.")
     return user32.LoadIconW(None, ctypes.c_void_p(32512))  # IDI_APPLICATION
 
 
@@ -1323,11 +1468,11 @@ def _tray_add(hwnd):
     nid.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP
     nid.uCallbackMessage = WM_TRAY
     nid.hIcon = _app_icon(user32.GetSystemMetrics(SM_CXSMICON))
-    nid.szTip = "Easy Copy Tracker — pano gelen kutusu"
+    nid.szTip = "Easy Copy Tracker — clipboard inbox"
     if shell32.Shell_NotifyIconW(NIM_ADD, ctypes.byref(nid)):
         _tray_data = nid
     else:
-        log("Tepsi simgesi eklenemedi (kritik değil).")
+        log("Could not add the tray icon (not critical).")
 
 
 def _tray_remove():
@@ -1340,12 +1485,12 @@ def _tray_menu(hwnd):
     if not menu:
         return
     try:
-        toggle_text = ("⏸ Yakalamayı Durdur" if _settings["capture_enabled"]
-                       else "▶ Yakalamayı Başlat")
-        user32.AppendMenuW(menu, MF_STRING, ID_TRAY_OPEN, "📋 Listeyi Aç")
+        toggle_text = ("⏸ Pause Capture" if _settings["capture_enabled"]
+                       else "▶ Start Capture")
+        user32.AppendMenuW(menu, MF_STRING, ID_TRAY_OPEN, "📋 Open the List")
         user32.AppendMenuW(menu, MF_STRING, ID_TRAY_TOGGLE, toggle_text)
         user32.AppendMenuW(menu, MF_SEPARATOR, 0, None)
-        user32.AppendMenuW(menu, MF_STRING, ID_TRAY_EXIT, "✕ Çıkış")
+        user32.AppendMenuW(menu, MF_STRING, ID_TRAY_EXIT, "✕ Quit")
         pt = wt.POINT()
         user32.GetCursorPos(ctypes.byref(pt))
         user32.SetForegroundWindow(hwnd)
@@ -1366,7 +1511,7 @@ def _wnd_proc(hwnd, msg, wparam, lparam):
         _events.put(time.time())
         return 0
     if msg in (WM_CLOSE, WM_DESTROY):
-        user32.PostQuitMessage(0)  # mesaj döngüsünü bitir → temiz kapanış
+        user32.PostQuitMessage(0)  # end the message loop -> clean shutdown
         return 0
     if msg == WM_TRAY:
         ev = lparam & 0xFFFF
@@ -1384,11 +1529,11 @@ def _wnd_proc(hwnd, msg, wparam, lparam):
     return user32.DefWindowProcW(hwnd, msg, wparam, lparam)
 
 
-_wnd_proc_ref = WNDPROC(_wnd_proc)  # GC'ye kapılmasın
+_wnd_proc_ref = WNDPROC(_wnd_proc)  # keep it from being garbage-collected
 
 
 def run_listener():
-    """Gizli pencere: pano dinleyicisi + tepsi simgesi + global kısayollar (ana iş parçacığı)."""
+    """Hidden window: clipboard listener + tray icon + global hotkeys (main thread)."""
     global _hwnd
     wc = WNDCLASSW()
     wc.lpfnWndProc = _wnd_proc_ref
@@ -1396,24 +1541,24 @@ def run_listener():
     wc.lpszClassName = "EasyCopyTrackerListener"
     if not user32.RegisterClassW(ctypes.byref(wc)):
         raise ctypes.WinError(ctypes.get_last_error())
-    # Tepsi geri çağrıları mesaj-only pencerelere gelmediği için normal gizli pencere
+    # Tray callbacks never reach message-only windows, so use a normal hidden one
     _hwnd = user32.CreateWindowExW(0, wc.lpszClassName, APP_NAME, 0,
                                    0, 0, 0, 0, None, None, wc.hInstance, None)
     if not _hwnd:
         raise ctypes.WinError(ctypes.get_last_error())
     if not user32.AddClipboardFormatListener(_hwnd):
         raise ctypes.WinError(ctypes.get_last_error())
-    # Pencere ikonu: Alt+Tab ve görev yöneticisinde uygulama simgesi görünsün
+    # Window icon: show the app icon in Alt+Tab and in Task Manager
     small = _app_icon(user32.GetSystemMetrics(SM_CXSMICON))
     big = _app_icon(user32.GetSystemMetrics(SM_CXICON))
     user32.SendMessageW(_hwnd, WM_SETICON, ICON_SMALL, small)
     user32.SendMessageW(_hwnd, WM_SETICON, ICON_BIG, big)
     _tray_add(_hwnd)
     if not user32.RegisterHotKey(_hwnd, HK_TOGGLE, MOD_CONTROL | MOD_ALT | MOD_NOREPEAT, 0x4B):
-        log("Ctrl+Alt+K kısayolu alınamadı (başka uygulama kullanıyor olabilir).")
+        log("Could not register the Ctrl+Alt+K hotkey (another app may hold it).")
     if not user32.RegisterHotKey(_hwnd, HK_OPEN, MOD_CONTROL | MOD_ALT | MOD_NOREPEAT, 0x4C):
-        log("Ctrl+Alt+L kısayolu alınamadı (başka uygulama kullanıyor olabilir).")
-    log("Pano dinleyicisi hazır — tepsi simgesi ve kısayollar aktif (Ctrl+Alt+K / Ctrl+Alt+L).")
+        log("Could not register the Ctrl+Alt+L hotkey (another app may hold it).")
+    log("Clipboard listener ready — tray icon and hotkeys active (Ctrl+Alt+K / Ctrl+Alt+L).")
     msg = wt.MSG()
     try:
         while True:
@@ -1426,37 +1571,52 @@ def run_listener():
         _tray_remove()
 
 
-# ---------------------------------------------------------------- web arayüzü
+# -------------------------------------------------------------- web interface
 
 app = Flask(__name__)
 
 ALLOWED_ORIGINS = {f"http://localhost:{PORT}", f"http://127.0.0.1:{PORT}"}
-ALLOWED_HOSTS = {f"localhost:{PORT}", f"127.0.0.1:{PORT}", "localhost", "127.0.0.1",
-                 f"[::1]:{PORT}", "[::1]"}
+# Port-less spellings are deliberately absent: Werkzeug normalises "127.0.0.1:80"
+# down to "127.0.0.1", so allowing the bare form would let that Host through.
+ALLOWED_HOSTS = {f"localhost:{PORT}", f"127.0.0.1:{PORT}", f"[::1]:{PORT}"}
+# Our own page always sends "same-origin"; typing the address sends "none".
+# Anything else is a request another site made on our behalf.
+ALLOWED_FETCH_SITES = {"same-origin", "none"}
 
 
 @app.before_request
 def request_guard():
-    """DNS rebinding + CSRF koruması.
+    """DNS rebinding + CSRF protection.
 
-    Host denetimi TÜM isteklere uygulanır: kötü niyetli bir site alan adını
-    127.0.0.1'e yeniden çözümleyip (DNS rebinding) sayfayı bizimle aynı köken
-    haline getirse bile Host başlığı kendi alan adını taşır ve istek reddedilir.
-    Böylece GET uçları da (pano geçmişini döndürenler) korunmuş olur.
+    The Host check applies to EVERY request: even if a hostile site re-resolves
+    its domain to 127.0.0.1 (DNS rebinding) and thereby becomes same-origin with
+    us, the Host header still carries its own domain and the request is refused.
+
+    Same-origin policy already stops another page from *reading* a GET response,
+    but not from making the request: status code, timing and the intrinsic size
+    of an image reply (/api/qr) still leak. So cross-site subresource loads are
+    refused as well. Following a plain link to the UI from somewhere else is
+    still allowed — that opens a tab the other site cannot read, and framing is
+    already blocked by X-Frame-Options.
     """
     if (request.host or "").lower() not in ALLOWED_HOSTS:
-        return jsonify({"ok": False, "error": "geçersiz host"}), 403
+        return jsonify({"ok": False, "error": "invalid host"}), 403
+    site = request.headers.get("Sec-Fetch-Site")
+    navigating = (request.headers.get("Sec-Fetch-Mode") == "navigate"
+                  and request.headers.get("Sec-Fetch-Dest") == "document")
+    if site and site not in ALLOWED_FETCH_SITES and not navigating:
+        return jsonify({"ok": False, "error": "invalid origin"}), 403
     if request.method == "POST":
         if request.headers.get("X-EasyCopyTracker") != "1":
-            return jsonify({"ok": False, "error": "geçersiz istek"}), 403
+            return jsonify({"ok": False, "error": "invalid request"}), 403
         origin = request.headers.get("Origin")
         if origin and origin not in ALLOWED_ORIGINS:
-            return jsonify({"ok": False, "error": "geçersiz origin"}), 403
+            return jsonify({"ok": False, "error": "invalid origin"}), 403
 
 
 @app.after_request
 def security_headers(resp):
-    """Çerçeveleme (clickjacking) ve içerik türü tahminine karşı temel başlıklar."""
+    """Baseline headers against clickjacking and content-type sniffing."""
     resp.headers["X-Frame-Options"] = "DENY"
     resp.headers["X-Content-Type-Options"] = "nosniff"
     resp.headers["Referrer-Policy"] = "no-referrer"
@@ -1487,107 +1647,116 @@ def favicon():
 
 @app.get("/api/items")
 def api_items():
+    # Snapshot under the lock, serialise outside it: turning a full list into
+    # JSON takes long enough that holding the lock would stall clipboard capture
+    # for as long as anything keeps requesting this endpoint.
     with _lock:
-        return jsonify({
+        payload = {
             "started": _started,
             "capture_enabled": _settings["capture_enabled"],
             "filter_mode": _settings["filter_mode"],
-            "custom_domains": _settings["custom_domains"],
+            "custom_domains": list(_settings["custom_domains"]),
             "retention": _settings["retention"],
             "active_collection": _settings["active_collection"],
-            "collections": _settings["collections"],
-            "items": _items,
+            "collections": [dict(c) for c in _settings["collections"]],
+            "items": [dict(it) for it in _items],
             "archive_count": len(_archive["items"]),
             "recovery_count": len(_recovery) if _recovery else 0,
             "qr_available": HAS_QR,
             "data_dir": DATA_DIR,
             "notifications_enabled": _settings["notifications_enabled"],
-            "startup_enabled": get_startup(),
-        })
+        }
+    payload["startup_enabled"] = get_startup()  # reads the registry — never under the lock
+    return jsonify(payload)
 
 
 @app.get("/api/archive")
 def api_archive():
     with _lock:
-        return jsonify({"items": _archive["items"], "retention": _settings["retention"]})
+        payload = {"items": [dict(e) for e in _archive["items"]],
+                   "retention": _settings["retention"]}
+    return jsonify(payload)
 
 
 @app.post("/api/settings")
 def api_settings():
-    """Ayarları günceller. Tüm alanlar ÖNCE doğrulanır, sonra uygulanır —
-    böylece bir alan geçersizse hiçbiri yarım uygulanmış olmaz."""
+    """Updates settings. Every field is validated FIRST and applied afterwards,
+    so an invalid field never leaves the others half-applied."""
     body = request.get_json(silent=True) or {}
     updates, changed = {}, []
 
     if "filter_mode" in body:
         if body["filter_mode"] not in FILTER_MODES:
-            return jsonify({"ok": False, "error": "geçersiz mod"}), 400
+            return jsonify({"ok": False, "error": "invalid mode"}), 400
         updates["filter_mode"] = body["filter_mode"]
-        changed.append("filtre=" + body["filter_mode"])
+        changed.append("filter=" + body["filter_mode"])
     if "custom_domains" in body:
         doms = body["custom_domains"]
         if not isinstance(doms, list):
-            return jsonify({"ok": False, "error": "geçersiz alan adı listesi"}), 400
+            return jsonify({"ok": False, "error": "invalid domain list"}), 400
         updates["custom_domains"] = [
             _norm_domain(str(s))[:100] for s in doms if str(s).strip()][:50]
-        changed.append("özel alan adları")
+        changed.append("custom domains")
     if "retention" in body:
         if body["retention"] not in RETENTIONS:
-            return jsonify({"ok": False, "error": "geçersiz saklama süresi"}), 400
+            return jsonify({"ok": False, "error": "invalid retention"}), 400
         updates["retention"] = body["retention"]
-        changed.append("saklama=" + body["retention"])
+        changed.append("retention=" + body["retention"])
 
     if "notifications_enabled" in body:
         updates["notifications_enabled"] = bool(body["notifications_enabled"])
-        changed.append("bildirimler=" + ("açık" if body["notifications_enabled"] else "kapalı"))
+        changed.append("notifications=" + ("on" if body["notifications_enabled"] else "off"))
 
-    if "startup_enabled" in body:  # kayıt defteri; ayar dosyasında tutulmaz
+    if "startup_enabled" in body:  # registry-backed; not stored in the settings file
         err = set_startup(bool(body["startup_enabled"]))
         if err:
-            return jsonify({"ok": False, "error": f"açılışta başlatma ayarlanamadı: {err}"}), 500
-        changed.append("açılışta başlat=" + ("açık" if body["startup_enabled"] else "kapalı"))
+            return jsonify({"ok": False, "error": f"could not set start with Windows: {err}"}), 500
+        changed.append("start with Windows=" + ("on" if body["startup_enabled"] else "off"))
 
     with _lock:
         previous = {k: _settings[k] for k in updates}
         _settings.update(updates)
     if "notifications_enabled" in body:
-        notify("🔔 Bildirimler " + ("açık" if body["notifications_enabled"] else "kapalı"),
-               "Kopyalama bildirimleri gösterilecek." if body["notifications_enabled"]
-               else "Kopyalama bildirimleri artık gösterilmeyecek.", force=True)
+        notify("🔔 Notifications " + ("on" if body["notifications_enabled"] else "off"),
+               "Copy notifications will be shown." if body["notifications_enabled"]
+               else "Copy notifications will no longer be shown.", force=True)
     if "capture_enabled" in body:
         with _lock:
             previous["capture_enabled"] = _settings["capture_enabled"]
             _settings["capture_enabled"] = bool(body["capture_enabled"])
-        changed.append("yakalama=" + ("açık" if body["capture_enabled"] else "kapalı"))
+        changed.append("capture=" + ("on" if body["capture_enabled"] else "off"))
     try:
         save_settings()
     except StorageError as e:
         with _lock:
-            _settings.update(previous)  # diske yazılamadıysa RAM'i de geri al
-        return jsonify({"ok": False, "error": f"ayarlar kaydedilemedi: {e}"}), 500
+            _settings.update(previous)  # the disk write failed — roll RAM back too
+        return jsonify({"ok": False, "error": f"could not save settings: {e}"}), 500
     if "capture_enabled" in body:
         announce_capture(_settings["capture_enabled"])
     if changed:
-        log("Ayar değişti: " + ", ".join(changed))
+        log("Setting changed: " + ", ".join(changed))
     return jsonify({"ok": True})
 
 
 @app.post("/api/collections")
 def api_collections_create():
     body = request.get_json(silent=True) or {}
-    name = str(body.get("name", "")).strip()[:40]
+    name = str(body.get("name", "")).strip()[:MAX_COLLECTION_NAME]
     if not name:
-        return jsonify({"ok": False, "error": "isim gerekli"}), 400
+        return jsonify({"ok": False, "error": "name required"}), 400
     with _lock:
+        if len(_settings["collections"]) >= MAX_COLLECTIONS:
+            return jsonify({"ok": False, "error": "too many collections"}), 400
         if any(c["name"].lower() == name.lower() for c in _settings["collections"]):
-            return jsonify({"ok": False, "error": "Bu isimde bir koleksiyon zaten var"}), 409
+            return jsonify({"ok": False,
+                            "error": "A collection with this name already exists"}), 409
         c = {"id": _settings["next_collection_id"], "name": name, "created_at": now_iso()}
         _settings["next_collection_id"] += 1
         _settings["collections"].append(c)
         _settings["active_collection"] = c["id"]
         resp = dict(c)
     save_settings()
-    log(f"Koleksiyon oluşturuldu ve aktif edildi: {name}")
+    log(f"Collection created and made active: {name}")
     return jsonify({"ok": True, "collection": resp})
 
 
@@ -1600,7 +1769,7 @@ def api_collections_activate():
         cid = -1
     with _lock:
         if not any(c["id"] == cid for c in _settings["collections"]):
-            return jsonify({"ok": False, "error": "bulunamadı"}), 404
+            return jsonify({"ok": False, "error": "not found"}), 404
         _settings["active_collection"] = cid
     save_settings()
     return jsonify({"ok": True})
@@ -1614,14 +1783,14 @@ def api_collections_delete():
     except (TypeError, ValueError):
         cid = -1
     if cid == 1:
-        return jsonify({"ok": False, "error": "Genel koleksiyonu silinemez"}), 400
+        return jsonify({"ok": False, "error": "The General collection cannot be deleted"}), 400
     with _lock:
         if not any(c["id"] == cid for c in _settings["collections"]):
-            return jsonify({"ok": False, "error": "bulunamadı"}), 404
+            return jsonify({"ok": False, "error": "not found"}), 404
         _settings["collections"] = [c for c in _settings["collections"] if c["id"] != cid]
         for it in _items:
             if it["collection"] == cid:
-                it["collection"] = 1  # öğeler Genel'e taşınır
+                it["collection"] = 1  # items move to General
         if _settings["active_collection"] == cid:
             _settings["active_collection"] = 1
     save_settings()
@@ -1634,7 +1803,7 @@ def _ids_from(body, key="ids"):
     if not isinstance(raw, list):
         return []
     out = []
-    for v in raw[:MAX_ITEMS]:  # üst sınır: tek istekte tüm listeden fazlası anlamsız
+    for v in raw[:MAX_ITEMS]:  # upper bound: more than the whole list is pointless
         try:
             out.append(int(v))
         except (TypeError, ValueError):
@@ -1654,7 +1823,7 @@ def api_toggle():
         checked = bool(checked)
     it = toggle_item(item_id, checked)
     if it is None:
-        return jsonify({"ok": False, "error": "bulunamadı"}), 404
+        return jsonify({"ok": False, "error": "not found"}), 404
     return jsonify({"ok": True, "item": it})
 
 
@@ -1667,7 +1836,7 @@ def api_pin():
         item_id = -1
     it = pin_item(item_id, bool(body.get("pinned")))
     if it is None:
-        return jsonify({"ok": False, "error": "bulunamadı"}), 404
+        return jsonify({"ok": False, "error": "not found"}), 404
     return jsonify({"ok": True, "item": it})
 
 
@@ -1676,7 +1845,7 @@ def api_delete():
     body = request.get_json(silent=True) or {}
     ids = _ids_from(body)
     if not ids:
-        return jsonify({"ok": False, "error": "id gerekli"}), 400
+        return jsonify({"ok": False, "error": "id required"}), 400
     removed = delete_items(ids)
     return jsonify({"ok": True, "removed": removed})
 
@@ -1686,11 +1855,11 @@ def api_archive_move():
     body = request.get_json(silent=True) or {}
     ids = _ids_from(body)
     if not ids:
-        return jsonify({"ok": False, "error": "id gerekli"}), 400
+        return jsonify({"ok": False, "error": "id required"}), 400
     try:
         moved = archive_items(ids)
     except StorageError as e:
-        return jsonify({"ok": False, "error": f"arşive yazılamadı: {e}"}), 500
+        return jsonify({"ok": False, "error": f"could not write the archive: {e}"}), 500
     return jsonify({"ok": True, "moved": moved})
 
 
@@ -1699,11 +1868,11 @@ def api_archive_delete():
     body = request.get_json(silent=True) or {}
     aids = _ids_from(body, "aids")
     if not aids:
-        return jsonify({"ok": False, "error": "aid gerekli"}), 400
+        return jsonify({"ok": False, "error": "aid required"}), 400
     try:
         removed = archive_delete(aids)
     except StorageError as e:
-        return jsonify({"ok": False, "error": f"arşiv güncellenemedi: {e}"}), 500
+        return jsonify({"ok": False, "error": f"could not update the archive: {e}"}), 500
     return jsonify({"ok": True, "removed": removed})
 
 
@@ -1712,23 +1881,23 @@ def api_archive_restore():
     body = request.get_json(silent=True) or {}
     aids = _ids_from(body, "aids")
     if not aids:
-        return jsonify({"ok": False, "error": "aid gerekli"}), 400
+        return jsonify({"ok": False, "error": "aid required"}), 400
     try:
         restored = archive_restore(aids)
     except StorageError as e:
-        return jsonify({"ok": False, "error": f"arşiv güncellenemedi: {e}"}), 500
+        return jsonify({"ok": False, "error": f"could not update the archive: {e}"}), 500
     return jsonify({"ok": True, "restored": restored})
 
 
 @app.post("/api/quit")
 def api_quit():
-    """Temiz kapanış — stop.bat bunu kullanır ki gölge kopya silinsin
-    ve bir sonraki açılışta sahte 'çökme' uyarısı çıkmasın."""
+    """Clean shutdown — stop.bat uses this so the crash shadow is removed and
+    the next start does not show a bogus 'crash' banner."""
     if _hwnd:
         user32.PostMessageW(_hwnd, WM_CLOSE, 0, 0)
     else:
         user32.PostThreadMessageW(_main_tid or 0, WM_QUIT, 0, 0)
-    log("Kapanış isteği alındı (stop.bat / arayüz).")
+    log("Shutdown requested (stop.bat / the UI).")
     return jsonify({"ok": True})
 
 
@@ -1737,7 +1906,7 @@ def api_clear():
     body = request.get_json(silent=True) or {}
     cid = body.get("collection")
     if not isinstance(cid, int):
-        return jsonify({"ok": False, "error": "koleksiyon id gerekli"}), 400
+        return jsonify({"ok": False, "error": "collection id required"}), 400
     clear_items(cid)
     return jsonify({"ok": True})
 
@@ -1757,10 +1926,10 @@ def api_recovery():
     body = request.get_json(silent=True) or {}
     action = body.get("action")
     if action == "restore":
-        with _lock:  # kontrol de kilit içinde: çift tıklama iki kez geri yüklemesin
+        with _lock:  # the check is inside the lock: a double click must not restore twice
             pending, _recovery = _recovery, None
             if pending is None:
-                return jsonify({"ok": False, "error": "kurtarılacak öğe yok"}), 404
+                return jsonify({"ok": False, "error": "nothing to recover"}), 404
             valid_cols = {c["id"] for c in _settings["collections"]}
             for src in pending:
                 it = _sanitize_entry(src, False)
@@ -1778,7 +1947,7 @@ def api_recovery():
             os.remove(RECOVERY_FILE)
         except OSError:
             pass
-        log(f"Önceki oturumdan {count} öğe geri yüklendi.")
+        log(f"Restored {count} item(s) from the previous session.")
         return jsonify({"ok": True, "restored": count})
     if action == "discard":
         _recovery = None
@@ -1787,13 +1956,13 @@ def api_recovery():
         except OSError:
             pass
         return jsonify({"ok": True})
-    return jsonify({"ok": False, "error": "geçersiz eylem"}), 400
+    return jsonify({"ok": False, "error": "invalid action"}), 400
 
 
 @app.get("/api/qr")
 def api_qr():
     if not HAS_QR:
-        return jsonify({"ok": False, "error": "qrcode paketi kurulu değil"}), 501
+        return jsonify({"ok": False, "error": "the qrcode package is not installed"}), 501
     try:
         item_id = int(request.args.get("id", -1))
     except (TypeError, ValueError):
@@ -1805,8 +1974,11 @@ def api_qr():
                 data = it["url"]
                 break
     if not data:
-        return jsonify({"ok": False, "error": "bulunamadı"}), 404
-    img = qrcode.make(data, image_factory=qrcode.image.svg.SvgPathImage, box_size=12)
+        return jsonify({"ok": False, "error": "not found"}), 404
+    try:
+        img = qrcode.make(data, image_factory=qrcode.image.svg.SvgPathImage, box_size=12)
+    except (ValueError, TypeError):  # a URL past ~2900 chars has no QR version
+        return jsonify({"ok": False, "error": "this link is too long for a QR code"}), 400
     return Response(img.to_string(), mimetype="image/svg+xml")
 
 
@@ -1814,16 +1986,16 @@ def run_flask():
     app.run(host=HOST, port=PORT, debug=False, use_reloader=False, threaded=True)
 
 
-# ---------------------------------------------------------------- bakım görevi
+# ------------------------------------------------------------- maintenance task
 
 def maintenance_thread():
-    """Dakikada bir: arşiv saklama süresi denetimi."""
+    """Once a minute: enforce the archive retention rule."""
     while True:
         time.sleep(60)
         try:
             purge_archive()
         except Exception as e:
-            log(f"Arşiv temizliği hatası: {e}")
+            log(f"Archive cleanup error: {e}")
 
 
 # ---------------------------------------------------------------------- main
@@ -1845,11 +2017,11 @@ def main():
     except OSError:
         probe.close()
         if _easycopytracker_on_port():
-            log("Easy Copy Tracker zaten çalışıyor — tarayıcıda liste açılıyor.")
+            log("Easy Copy Tracker is already running — opening the list in the browser.")
             webbrowser.open(URL)
         else:
-            log(f"HATA: {PORT} portu başka bir uygulama tarafından kullanılıyor; "
-                f"Easy Copy Tracker başlatılamadı. O uygulamayı kapatıp yeniden deneyin.")
+            log(f"ERROR: port {PORT} is held by another application, so Easy Copy "
+                f"Tracker could not start. Close that application and try again.")
         return
     probe.close()
 
@@ -1857,22 +2029,22 @@ def main():
     migrate_from_old_name()
     migrate_data_dir()
     _drop_legacy_startup()
-    try:  # bozuk/kurcalanmış bir dosya uygulamayı kalıcı olarak açılmaz yapmasın
+    try:  # a corrupt/tampered file must not make the app permanently unstartable
         migrate_legacy()
         if not load_settings():
-            save_settings()  # ilk çalıştırma — varsayılanları yaz
+            save_settings()  # first run — write the defaults
         load_archive()
         check_recovery()
         purge_archive()
     except Exception as e:
-        log(f"HATA: kayıtlı veriler okunamadı ({e}). Bozuk dosyalar karantinaya alınıyor.")
+        log(f"ERROR: stored data could not be read ({e}). Quarantining the corrupt files.")
         for path in (SETTINGS_FILE, ARCHIVE_FILE, RECOVERY_FILE, BACKUP_FILE):
             if os.path.exists(path):
                 try:
                     os.replace(path, path + ".corrupt")
                 except OSError:
                     pass
-        log("Uygulama varsayılan ayarlarla başlıyor (.corrupt yedekleri korundu).")
+        log("Starting with default settings (the .corrupt backups were kept).")
 
     try:
         with open(PID_FILE, "w") as f:
@@ -1886,11 +2058,11 @@ def main():
     threading.Thread(target=toast_thread, daemon=True).start()
     threading.Thread(target=maintenance_thread, daemon=True).start()
     threading.Thread(target=backup_thread, daemon=True).start()
-    log(f"Easy Copy Tracker v1.0 başladı. Web arayüzü: {URL}  (aktif liste RAM'de, arşiv diskte)")
-    log(f"Veri klasörü: {DATA_DIR}")
+    log(f"Easy Copy Tracker v1.0 started. Web UI: {URL}  (active list in RAM, archive on disk)")
+    log(f"Data folder: {DATA_DIR}")
     if not HAS_QR:
-        log("Not: 'qrcode' paketi yok — QR özelliği kapalı (pip install qrcode).")
-    notify("📋 Easy Copy Tracker başladı", f"Kopyaladığın her şey listeye düşecek. Liste: {URL}")
+        log("Note: the 'qrcode' package is missing — the QR feature is off (pip install qrcode).")
+    notify("📋 Easy Copy Tracker started", f"Everything you copy lands on the list: {URL}")
     if "--open" in sys.argv:
         webbrowser.open(URL)
 
@@ -1905,12 +2077,12 @@ def main():
     except KeyboardInterrupt:
         pass
     finally:
-        delete_backup()  # temiz kapanış — RAM listesi bilerek uçucu
+        delete_backup()  # clean shutdown — the RAM list is volatile by design
         try:
             os.remove(PID_FILE)
         except OSError:
             pass
-        log("Easy Copy Tracker durdu.")
+        log("Easy Copy Tracker stopped.")
 
 
 if __name__ == "__main__":

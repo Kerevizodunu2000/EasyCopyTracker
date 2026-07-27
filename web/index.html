@@ -1,9 +1,9 @@
 ﻿<!DOCTYPE html>
-<html lang="tr">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Easy Copy Tracker — Kopyalananlar</title>
+<title>Easy Copy Tracker — Clipboard inbox</title>
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%2312070d'/><rect x='12' y='16.5' width='40' height='7' rx='3.5' fill='%23ff2d6f'/><rect x='12' y='28.5' width='28' height='7' rx='3.5' fill='%23ff5c8a' opacity='.72'/><rect x='12' y='40.5' width='34' height='7' rx='3.5' fill='%23ffa8c0' opacity='.44'/></svg>">
 <style>
@@ -35,7 +35,7 @@ select,input{font-family:inherit}
 
 .app{display:grid;grid-template-columns:260px 1fr;min-height:100vh}
 
-/* ---------------- kenar çubuğu ---------------- */
+/* ---------------- sidebar ---------------- */
 aside{background:var(--side);border-right:1px solid var(--line);padding:20px 14px;position:sticky;top:0;height:100vh;overflow-y:auto;display:flex;flex-direction:column;gap:20px}
 .brand{font-size:19px;font-weight:700;letter-spacing:.3px;padding:0 6px;display:flex;align-items:center}
 .brand .logo{margin-right:9px;border-radius:6px;flex:none}
@@ -103,7 +103,7 @@ ul.plain{list-style:none;display:flex;flex-direction:column;gap:2px}
 .sideinfo{margin-top:14px;font-size:11px;color:var(--muted);padding:0 6px;line-height:1.7}
 .sideinfo code{color:var(--muted)}
 
-/* ---------------- içerik ---------------- */
+/* ---------------- content ---------------- */
 main{padding:22px 26px 110px;max-width:920px;width:100%}
 .tophead{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px}
 .tophead h1{font-size:21px;font-weight:600;display:flex;align-items:center;gap:10px}
@@ -158,7 +158,7 @@ body.offline #offline{display:block}
 #recoveryBanner button{background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:5px 12px;font-size:12px;cursor:pointer}
 #recoveryBanner button:hover{border-color:var(--accent)}
 
-/* seçim çubuğu */
+/* selection bar */
 #bulkbar{display:none;position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--panel);border:1px solid var(--accent);border-radius:14px;padding:10px 16px;z-index:60;box-shadow:0 8px 30px var(--shadow);align-items:center;gap:10px}
 #bulkbar.show{display:flex}
 #bulkbar .bcount{font-size:13px;color:var(--accent);font-weight:600;margin-right:4px}
@@ -247,60 +247,60 @@ body.selecting .actions{display:none}
         <rect x="12" y="28.5" width="28" height="7" rx="3.5" fill="#ff5c8a" opacity=".72"/>
         <rect x="12" y="40.5" width="34" height="7" rx="3.5" fill="#ffa8c0" opacity=".44"/>
       </svg>Easy Copy Tracker
-      <button id="themeBtn" title="Açık / koyu tema">🌙</button>
+      <button id="themeBtn" title="Light / dark theme">🌙</button>
     </div>
 
     <nav>
-      <h3>Yakalama Filtresi</h3>
-      <button class="fbtn" data-mode="all"><span class="dot"></span>Tümü</button>
-      <button class="fbtn" data-mode="links"><span class="dot"></span>🔗 Sadece linkler</button>
-      <button class="fbtn" data-mode="instagram"><span class="dot"></span>📷 Sadece Instagram</button>
-      <button class="fbtn" data-mode="custom"><span class="dot"></span>🎯 Özel alan adları</button>
+      <h3>Capture filter</h3>
+      <button class="fbtn" data-mode="all"><span class="dot"></span>Everything</button>
+      <button class="fbtn" data-mode="links"><span class="dot"></span>🔗 Links only</button>
+      <button class="fbtn" data-mode="instagram"><span class="dot"></span>📷 Instagram only</button>
+      <button class="fbtn" data-mode="custom"><span class="dot"></span>🎯 Custom domains</button>
       <div class="domrow" id="domRow">
         <input id="domInput" placeholder="youtube.com, x.com…">
-        <button id="domSave">Kaydet</button>
+        <button id="domSave">Save</button>
       </div>
       <div class="fdesc" id="fdesc"></div>
     </nav>
 
     <nav>
-      <h3>Koleksiyonlar</h3>
+      <h3>Collections</h3>
       <ul class="plain" id="colList"></ul>
       <div class="newcol">
-        <input id="newColName" maxlength="40" placeholder="Yeni koleksiyon…">
-        <button id="newColBtn" title="Koleksiyon oluştur">+</button>
+        <input id="newColName" maxlength="40" placeholder="New collection…">
+        <button id="newColBtn" title="Create collection">+</button>
       </div>
       <ul class="plain" style="margin-top:10px">
         <li><div class="colrow" id="archiveNav">
-          <span class="cname">🗄 Arşiv</span>
+          <span class="cname">🗄 Archive</span>
           <span class="ccount" id="archCount">0</span>
         </div></li>
       </ul>
     </nav>
 
     <nav class="settings">
-      <h3>⚙ Ayarlar</h3>
+      <h3>⚙ Settings</h3>
 
-      <div class="setrow" id="startupRow" title="Windows açılışında Easy Copy Tracker'ı arka planda başlatır">
-        <span class="setlbl">🚀 Windows açılışında başlat</span>
+      <div class="setrow" id="startupRow" title="Starts Easy Copy Tracker in the background when Windows starts">
+        <span class="setlbl">🚀 Start with Windows</span>
         <span class="mini"><span class="track"></span></span>
       </div>
-      <div class="setrow" id="notifRow" title="Her kopyalamada sağ altta çıkan bildirimi aç/kapat">
-        <span class="setlbl">🔔 Bildirimler</span>
+      <div class="setrow" id="notifRow" title="Turn the bottom-right popup on every copy on or off">
+        <span class="setlbl">🔔 Notifications</span>
         <span class="mini"><span class="track"></span></span>
       </div>
 
-      <label for="retention">Arşiv saklama süresi (dolunca otomatik silinir)</label>
+      <label for="retention">Archive retention (deleted automatically when it expires)</label>
       <select id="retention">
-        <option value="1h">1 saat</option>
-        <option value="1d">1 gün</option>
-        <option value="eod">Gün sonu (her gece boşalır)</option>
-        <option value="1m">1 ay (varsayılan)</option>
-        <option value="forever">Sonsuz</option>
+        <option value="1h">1 hour</option>
+        <option value="1d">1 day</option>
+        <option value="eod">End of day (cleared every night)</option>
+        <option value="1m">1 month (default)</option>
+        <option value="forever">Forever</option>
       </select>
       <div class="shortcuts" style="margin-top:12px">
-        <b>Ctrl+Alt+K</b> yakalama aç/kapat<br>
-        <b>Ctrl+Alt+L</b> listeyi aç
+        <b>Ctrl+Alt+K</b> toggle capture<br>
+        <b>Ctrl+Alt+L</b> open the list
       </div>
     </nav>
 
@@ -316,7 +316,7 @@ body.selecting .actions{display:none}
         8c0-4.42-3.58-8-8-8z"/>
       </svg>
       <span class="ghtext">
-        <b>Kaynak kodu · GitHub</b>
+        <b>Source code · GitHub</b>
         <small>Kerevizodunu2000/EasyCopyTracker</small>
       </span>
       <span class="gharrow">↗</span>
@@ -324,62 +324,62 @@ body.selecting .actions{display:none}
 
     <div class="sideinfo">
       <div id="started"></div>
-      <div>Aktif liste RAM'de · arşiv <code>archive.json</code></div>
-      <div id="dataDir" title="Arşiv ve ayarların saklandığı klasör"></div>
+      <div>Active list in RAM · archive <code>archive.json</code></div>
+      <div id="dataDir" title="Folder where the archive and settings are kept"></div>
     </div>
   </aside>
 
   <main>
     <div class="tophead">
-      <h1><span id="viewTitle"></span><span class="capbadge" id="capBadge">● KAYIT BURAYA</span></h1>
-      <div class="switch" id="capSwitch" title="Yakalamayı aç/kapat (Ctrl+Alt+K)">
-        <span class="track"></span><span class="lbl" id="capLbl">Yakalama</span>
+      <h1><span id="viewTitle"></span><span class="capbadge" id="capBadge">● SAVING HERE</span></h1>
+      <div class="switch" id="capSwitch" title="Toggle capture (Ctrl+Alt+K)">
+        <span class="track"></span><span class="lbl" id="capLbl">Capture</span>
       </div>
       <div class="stats" id="statChips">
-        <span class="chip blue">Bekleyen <b id="cntPending">0</b></span>
-        <span class="chip green">Tamamlanan <b id="cntDone">0</b></span>
-        <span class="chip">Toplam <b id="cntTotal">0</b></span>
+        <span class="chip blue">Pending <b id="cntPending">0</b></span>
+        <span class="chip green">Done <b id="cntDone">0</b></span>
+        <span class="chip">Total <b id="cntTotal">0</b></span>
       </div>
     </div>
 
-    <div id="pausedBanner">⏸ Yakalama kapalı — kopyaladıkların şu an kaydedilmiyor. Şalterle ya da Ctrl+Alt+K ile aç.</div>
-    <div id="emptyDomainsBanner">🎯 Filtre <b>“Özel alan adları”</b> seçili ama liste boş — bu yüzden <b>hiçbir şey kaydedilmiyor</b>. Soldan alan adı ekle (ör. <code>instagram.com</code>) ya da filtreyi <b>Tümü</b> yap.</div>
-    <div id="filterBanner">🔎 Yakalama filtresi <b id="filterName"></b> — bu filtreye uymayan kopyalar <b>kaydedilmiyor</b>.
-      <button id="filterAllBtn">Tümünü yakala</button></div>
+    <div id="pausedBanner">⏸ Capture is off — nothing you copy is being saved. Turn it back on with the switch or Ctrl+Alt+K.</div>
+    <div id="emptyDomainsBanner">🎯 The filter is <b>“Custom domains”</b> but the list is empty — so <b>nothing is being saved</b>. Add a domain on the left (e.g. <code>instagram.com</code>) or switch the filter to <b>Everything</b>.</div>
+    <div id="filterBanner">🔎 Capture filter: <b id="filterName"></b> — copies that do not match it are <b>not saved</b>.
+      <button id="filterAllBtn">Capture everything</button></div>
     <div id="recoveryBanner">💾 <span id="recText"></span>
-      <button id="recRestore">Geri Yükle</button>
-      <button id="recDiscard">Yoksay</button>
+      <button id="recRestore">Restore</button>
+      <button id="recDiscard">Dismiss</button>
     </div>
 
     <div class="toolrow" id="toolRow">
-      <input id="search" type="search" placeholder="Bu görünümde ara…">
-      <button class="tbtn primary" id="copyListBtn" title="Görünen bekleyenleri panoya kopyala">⧉ Listeyi kopyala</button>
-      <button class="tbtn primary" id="downloadBtn" title=".txt olarak indir">⬇ İndir</button>
-      <button class="tbtn" id="selectBtn">☑ Seç</button>
-      <button class="tbtn" id="clearBtn" title="Bu koleksiyonu temizle (📌 sabitler kalır)">Temizle</button>
+      <input id="search" type="search" placeholder="Search this view…">
+      <button class="tbtn primary" id="copyListBtn" title="Copy the visible pending items to the clipboard">⧉ Copy list</button>
+      <button class="tbtn primary" id="downloadBtn" title="Download as .txt">⬇ Download</button>
+      <button class="tbtn" id="selectBtn">☑ Select</button>
+      <button class="tbtn" id="clearBtn" title="Clear this collection (📌 pinned items stay)">Clear</button>
     </div>
 
     <div class="vchips" id="vchips">
-      <button class="vchip" data-v="all">Tümü</button>
-      <button class="vchip" data-v="links">🔗 Linkler</button>
+      <button class="vchip" data-v="all">All</button>
+      <button class="vchip" data-v="links">🔗 Links</button>
       <button class="vchip" data-v="instagram">📷 Instagram</button>
-      <button class="vchip" data-v="texts">📝 Metinler</button>
+      <button class="vchip" data-v="texts">📝 Texts</button>
     </div>
 
     <div class="progress" id="progressWrap"><i id="bar"></i></div>
 
-    <div id="offline">⚠️ Uygulamaya ulaşılamıyor — Easy Copy Tracker kapalı görünüyor. <code>start.bat</code> ile yeniden başlatın.</div>
+    <div id="offline">⚠️ Cannot reach the app — Easy Copy Tracker looks closed. Restart it with <code>start.bat</code>.</div>
 
     <div id="listView">
       <section>
-        <h2>Bekleyenler <span class="cnt" id="cntP2"></span></h2>
+        <h2>Pending <span class="cnt" id="cntP2"></span></h2>
         <div id="pendingArea"></div>
         <div class="empty" id="emptyPending"></div>
       </section>
 
       <section id="doneSection" style="display:none">
-        <h2>Tamamlananlar <span class="cnt" id="cntD2"></span>
-          <button class="h2btn" id="archiveDoneBtn">🗄 Tamamlananları arşivle</button>
+        <h2>Done <span class="cnt" id="cntD2"></span>
+          <button class="h2btn" id="archiveDoneBtn">🗄 Archive the done ones</button>
         </h2>
         <div id="doneArea"></div>
       </section>
@@ -388,17 +388,17 @@ body.selecting .actions{display:none}
     <div id="archiveView" style="display:none">
       <div class="archnote" id="archNote"></div>
       <div id="archiveArea"></div>
-      <div class="empty" id="emptyArchive">Arşiv boş. Listeden 🗄 düğmesiyle öğe arşivleyebilirsin.</div>
+      <div class="empty" id="emptyArchive">The archive is empty. Use the 🗄 button on a list item to archive it.</div>
     </div>
   </main>
 </div>
 
 <div id="bulkbar">
   <span class="bcount" id="bulkCount"></span>
-  <button id="bulkCopy">⧉ Kopyala</button>
-  <button id="bulkArchive">🗄 Arşivle</button>
-  <button id="bulkDelete" class="danger">✕ Sil</button>
-  <button id="bulkCancel">Vazgeç</button>
+  <button id="bulkCopy">⧉ Copy</button>
+  <button id="bulkArchive">🗄 Archive</button>
+  <button id="bulkDelete" class="danger">✕ Delete</button>
+  <button id="bulkCancel">Cancel</button>
 </div>
 
 <div id="qrModal"><div class="qrbox"><img id="qrImg" alt="QR"><div class="qurl" id="qrUrl"></div></div></div>
@@ -410,14 +410,14 @@ const state = {
   last: "", data: null, archive: null, query: "",
   view: "list", viewFilter: "all",
   selecting: false, selected: new Set(),
-  // Silme onayı DOM'da değil burada tutulur: yeni bir kopya geldiğinde kenar
-  // çubuğu yeniden çizilir ve düğmedeki "Emin?" durumu yoksa kaybolurdu.
+  // The delete confirmation lives here, not in the DOM: a new copy redraws the
+  // sidebar, which would otherwise wipe the "Sure?" state off the button.
   armedCollection: null, armedUntil: 0
 };
-const ARM_MS = 5000;  // onay penceresi — 2,5 sn gerçek kullanımda çok kısaydı
+const ARM_MS = 5000;  // confirmation window — 2.5 s was far too short in real use
 const HDRS = {"Content-Type": "application/json", "X-EasyCopyTracker": "1"};
 
-/* ---------------- tema (açık / koyu) ---------------- */
+/* ---------------- theme (light / dark) ---------------- */
 (function(){
   const KEY = "easycopytracker-theme";
   const btn = document.getElementById("themeBtn");
@@ -425,7 +425,7 @@ const HDRS = {"Content-Type": "application/json", "X-EasyCopyTracker": "1"};
   function apply(theme){
     document.documentElement.setAttribute("data-theme", theme);
     btn.textContent = theme === "dark" ? "🌙" : "☀️";
-    btn.title = theme === "dark" ? "Açık temaya geç" : "Koyu temaya geç";
+    btn.title = theme === "dark" ? "Switch to the light theme" : "Switch to the dark theme";
   }
   let saved = null;
   try{ saved = localStorage.getItem(KEY); }catch(e){}
@@ -435,7 +435,7 @@ const HDRS = {"Content-Type": "application/json", "X-EasyCopyTracker": "1"};
     apply(next);
     try{ localStorage.setItem(KEY, next); }catch(e){}
   });
-  // Kullanıcı kendi seçimini yapmadıysa sistem temasını takip et
+  // Follow the system theme until the user picks one explicitly
   sysDark.addEventListener("change", function(e){
     let s = null;
     try{ s = localStorage.getItem(KEY); }catch(err){}
@@ -443,29 +443,30 @@ const HDRS = {"Content-Type": "application/json", "X-EasyCopyTracker": "1"};
   });
 })();
 const FDESC = {
-  all: "Her kopyalanan şey kaydediliyor.",
-  links: "Sadece web sitesi linkleri kaydediliyor; düz metinler atlanıyor.",
-  instagram: "Sadece instagram.com linkleri kaydediliyor.",
-  custom: "Sadece aşağıdaki alan adlarının linkleri kaydediliyor.",
-  custom_empty: "⚠️ Liste boş — hiçbir şey kaydedilmiyor. Alan adı ekle."
+  all: "Everything you copy is being saved.",
+  links: "Only website links are saved; plain text is skipped.",
+  instagram: "Only instagram.com links are saved.",
+  custom: "Only links on the domains listed below are saved.",
+  custom_empty: "⚠️ The list is empty — nothing is being saved. Add a domain."
 };
-const FNAME = {links:"🔗 Sadece linkler", instagram:"📷 Sadece Instagram", custom:"🎯 Özel alan adları"};
-const RETENTION_LABEL = {"1h":"1 saat","1d":"1 gün","eod":"gün sonu","1m":"1 ay","forever":"sonsuz"};
+const FNAME = {links:"🔗 Links only", instagram:"📷 Instagram only", custom:"🎯 Custom domains"};
+const RETENTION_LABEL = {"1h":"1 hour","1d":"1 day","eod":"end of day","1m":"1 month","forever":"forever"};
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
 function fmtTime(iso){ return iso ? iso.slice(11,16) : ""; }
 function fmtDT(iso){
   if(!iso) return "";
-  const d = iso.slice(0,10).split("-");
-  return d[2] + "." + d[1] + "." + d[0] + " " + iso.slice(11,16);
+  return iso.slice(0,10) + " " + iso.slice(11,16);
 }
 function pad(n){ return String(n).padStart(2,"0"); }
 function dayKeyOf(date){ return date.getFullYear() + "-" + pad(date.getMonth()+1) + "-" + pad(date.getDate()); }
 function dayLabel(key){
-  if(!key) return "Tarihsiz";
+  if(!key) return "No date";
   const now = new Date();
-  if(key === dayKeyOf(now)) return "Bugün";
-  if(key === dayKeyOf(new Date(now.getTime() - 86400000))) return "Dün";
-  return key.split("-").reverse().join(".");
+  if(key === dayKeyOf(now)) return "Today";
+  if(key === dayKeyOf(new Date(now.getTime() - 86400000))) return "Yesterday";
+  const p = key.split("-");
+  return MONTHS[Number(p[1]) - 1] + " " + Number(p[2]) + ", " + p[0];
 }
 function hostOf(url){
   try{ return new URL(url).hostname.replace(/^www\./,""); }catch(e){ return ""; }
@@ -474,7 +475,7 @@ function isInsta(url){
   const h = hostOf(url || "");
   return h === "instagram.com" || h.endsWith(".instagram.com");
 }
-function lc(s){ return String(s||"").toLocaleLowerCase("tr"); }
+function lc(s){ return String(s||"").toLocaleLowerCase("en"); }
 
 let toastTimer = null;
 function miniToast(msg, isErr){
@@ -493,7 +494,7 @@ async function post(path, body){
     out = await r.json().catch(function(){ return {ok:r.ok}; });
     if(!r.ok && out && out.error) miniToast(out.error, true);
   }catch(e){
-    miniToast("Sunucuya ulaşılamadı", true);
+    miniToast("Could not reach the server", true);
   }
   state.last = "";
   refresh();
@@ -507,12 +508,12 @@ async function copyText(text){
     await navigator.clipboard.writeText(text);
     return true;
   }catch(e){
-    miniToast("Panoya yazılamadı", true);
+    miniToast("Could not write to the clipboard", true);
     return false;
   }
 }
 
-/* ---------------- görünüm filtresi ---------------- */
+/* ---------------- view filter ---------------- */
 function matchesView(it){
   const v = state.viewFilter;
   if(v === "links") return !!it.is_link;
@@ -526,7 +527,7 @@ function matchesQuery(it){
   return lc(it.text).includes(q) || lc(it.title).includes(q) || lc(it.url).includes(q);
 }
 
-/* ---------------- kart ---------------- */
+/* ---------------- card ---------------- */
 function card(it, isDone){
   const li = document.createElement("li");
   li.className = "card" + (isDone ? " done" : "") + (it.pinned ? " pinned" : "")
@@ -543,7 +544,7 @@ function card(it, isDone){
 
   const cb = document.createElement("button");
   cb.className = "check";
-  cb.title = isDone ? "Geri al" : "Tamamlandı olarak işaretle";
+  cb.title = isDone ? "Undo" : "Mark as done";
   cb.textContent = "✓";
   cb.addEventListener("click", function(){ toggle(it.id, !isDone); });
   li.appendChild(cb);
@@ -576,8 +577,8 @@ function card(it, isDone){
     if(it.title){
       const su = document.createElement("span");
       su.className = "suburl";
-      // Ham metin yerine normalize URL: userinfo (https://iyi.com@kotu.com) gibi
-      // yanıltıcı biçimler burada gerçek adresi gizleyemesin.
+      // Show the normalised URL rather than the raw text, so misleading forms
+      // like userinfo (https://good.com@evil.com) cannot hide the real address.
       let shownUrl = it.text.trim();
       try{ const u = new URL(it.url); shownUrl = u.origin + u.pathname + u.search; }catch(e){}
       su.textContent = shownUrl;
@@ -591,7 +592,7 @@ function card(it, isDone){
     body.appendChild(p);
     if(!isDone){
       body.classList.add("clickable");
-      body.title = "Tamamlandı olarak işaretlemek için tıkla";
+      body.title = "Click to mark it done";
       body.addEventListener("click", function(){ toggle(it.id, true); });
     }
   }
@@ -612,7 +613,7 @@ function card(it, isDone){
     const c = document.createElement("span");
     c.className = "badge copies";
     c.textContent = "×" + it.copies;
-    c.title = "Bu içerik " + it.copies + " kez kopyalandı";
+    c.title = "This content was copied " + it.copies + " times";
     meta.appendChild(c);
   }
   body.appendChild(meta);
@@ -623,13 +624,13 @@ function card(it, isDone){
 
   const pin = document.createElement("button");
   pin.className = "icobtn" + (it.pinned ? " pin-on" : "");
-  pin.title = it.pinned ? "Sabitlemeyi kaldır" : "Sabitle (Temizle'den etkilenmez)";
+  pin.title = it.pinned ? "Unpin" : "Pin (survives Clear)";
   pin.textContent = "📌";
   pin.addEventListener("click", function(){ post("/api/pin", {id:it.id, pinned:!it.pinned}); });
   actions.appendChild(pin);
 
   const cp = document.createElement("button");
-  cp.className = "icobtn"; cp.title = "Panoya kopyala"; cp.textContent = "⧉";
+  cp.className = "icobtn"; cp.title = "Copy to clipboard"; cp.textContent = "⧉";
   cp.addEventListener("click", async function(e){
     e.stopPropagation();
     if(await copyText(it.text)){
@@ -641,18 +642,18 @@ function card(it, isDone){
 
   if(isSafeLink && state.data && state.data.qr_available){
     const qr = document.createElement("button");
-    qr.className = "icobtn"; qr.title = "QR kod (telefonda aç)"; qr.textContent = "▦";
+    qr.className = "icobtn"; qr.title = "QR code (open it on your phone)"; qr.textContent = "▦";
     qr.addEventListener("click", function(){ showQR(it); });
     actions.appendChild(qr);
   }
 
   const ar = document.createElement("button");
-  ar.className = "icobtn"; ar.title = "Arşivle (diske taşı)"; ar.textContent = "🗄";
+  ar.className = "icobtn"; ar.title = "Archive (move it to disk)"; ar.textContent = "🗄";
   ar.addEventListener("click", function(){ post("/api/archive", {ids:[it.id]}); });
   actions.appendChild(ar);
 
   const del = document.createElement("button");
-  del.className = "icobtn danger"; del.title = "Sil"; del.textContent = "✕";
+  del.className = "icobtn danger"; del.title = "Delete"; del.textContent = "✕";
   del.addEventListener("click", function(){ post("/api/delete", {ids:[it.id]}); });
   actions.appendChild(del);
 
@@ -670,7 +671,7 @@ document.getElementById("qrModal").addEventListener("click", function(){
   this.classList.remove("show");
 });
 
-/* ---------------- gruplu çizim ---------------- */
+/* ---------------- grouped rendering ---------------- */
 function renderGrouped(area, items, dateKey, isDone, pinnedFirst){
   area.innerHTML = "";
   let rest = items;
@@ -680,7 +681,7 @@ function renderGrouped(area, items, dateKey, isDone, pinnedFirst){
     if(pinned.length){
       const lbl = document.createElement("div");
       lbl.className = "daylabel";
-      lbl.textContent = "📌 Sabitlenmiş";
+      lbl.textContent = "📌 Pinned";
       area.appendChild(lbl);
       const ul = document.createElement("ul"); ul.className = "cards";
       pinned.forEach(function(it){ ul.appendChild(card(it, isDone)); });
@@ -703,27 +704,27 @@ function renderGrouped(area, items, dateKey, isDone, pinnedFirst){
   }
 }
 
-/* ---------------- ana çizim ---------------- */
+/* ---------------- main render ---------------- */
 function render(){
   const d = state.data;
   if(!d) return;
   const items = d.items || [];
   const cols = d.collections || [];
   const active = d.active_collection;
-  const activeCol = cols.find(function(c){ return c.id === active; }) || {id:1, name:"Genel"};
+  const activeCol = cols.find(function(c){ return c.id === active; }) || {id:1, name:"General"};
 
   document.body.classList.toggle("paused", !d.capture_enabled);
-  // "Özel alan adları" seçili ama liste boşsa hiçbir şey yakalanmaz — sessiz kalma
+  // "Custom domains" with an empty list captures nothing — do not stay silent
   const noDomains = d.filter_mode === "custom" && (!d.custom_domains || !d.custom_domains.length);
   document.body.classList.toggle("nodomains", noDomains && d.capture_enabled);
-  // Filtre "Tümü" değilse bunu sürekli görünür kıl — yoksa uygulama bozuk sanılıyor
+  // Keep a non-"Everything" filter visible at all times, or the app looks broken
   const filtering = d.filter_mode !== "all" && d.capture_enabled && !noDomains;
   document.body.classList.toggle("filtered", filtering);
   if(filtering) document.getElementById("filterName").textContent = FNAME[d.filter_mode] || d.filter_mode;
   document.body.classList.toggle("selecting", state.selecting);
   const sw = document.getElementById("capSwitch");
   sw.classList.toggle("on", !!d.capture_enabled);
-  document.getElementById("capLbl").textContent = d.capture_enabled ? "Yakalama açık" : "Yakalama kapalı";
+  document.getElementById("capLbl").textContent = d.capture_enabled ? "Capture on" : "Capture off";
 
   document.querySelectorAll(".fbtn").forEach(function(b){
     b.classList.toggle("active", b.dataset.mode === d.filter_mode);
@@ -743,7 +744,7 @@ function render(){
     b.classList.toggle("active", b.dataset.v === state.viewFilter);
   });
 
-  // koleksiyonlar
+  // collections
   const cl = document.getElementById("colList");
   cl.innerHTML = "";
   cols.forEach(function(c){
@@ -765,14 +766,14 @@ function render(){
     row.appendChild(cnt);
     if(c.id === active){
       const lv = document.createElement("span");
-      lv.className = "live"; lv.textContent = "● AKTİF";
+      lv.className = "live"; lv.textContent = "● ACTIVE";
       row.appendChild(lv);
     }
     if(c.id !== 1){
       const del = document.createElement("button");
-      del.className = "cdel"; del.title = "Koleksiyonu sil (öğeler Genel'e taşınır)"; del.textContent = "✕";
+      del.className = "cdel"; del.title = "Delete the collection (items move to General)"; del.textContent = "✕";
       const isArmed = state.armedCollection === c.id && Date.now() < state.armedUntil;
-      if(isArmed){ del.classList.add("armed"); del.textContent = "Emin?"; }
+      if(isArmed){ del.classList.add("armed"); del.textContent = "Sure?"; }
       del.addEventListener("click", function(e){
         e.stopPropagation();
         if(state.armedCollection === c.id && Date.now() < state.armedUntil){
@@ -781,7 +782,7 @@ function render(){
         }else{
           state.armedCollection = c.id;
           state.armedUntil = Date.now() + ARM_MS;
-          del.classList.add("armed"); del.textContent = "Emin?";
+          del.classList.add("armed"); del.textContent = "Sure?";
           setTimeout(function(){
             if(state.armedCollection === c.id) state.armedCollection = null;
             renderFromCache();
@@ -796,17 +797,17 @@ function render(){
   document.getElementById("archCount").textContent = d.archive_count || 0;
   document.getElementById("archiveNav").className = "colrow" + (state.view === "archive" ? " active" : "");
 
-  // kurtarma bandı
+  // recovery banner
   const rb = document.getElementById("recoveryBanner");
   if(d.recovery_count > 0){
     document.getElementById("recText").textContent =
-      "Önceki oturum beklenmedik şekilde kapanmış — " + d.recovery_count + " öğe kurtarılabilir.";
+      "The previous session ended unexpectedly — " + d.recovery_count + " item(s) can be recovered.";
     rb.classList.add("show");
   }else{
     rb.classList.remove("show");
   }
 
-  document.getElementById("started").textContent = "Oturum: " + fmtDT(d.started);
+  document.getElementById("started").textContent = "Session: " + fmtDT(d.started);
   const dd = document.getElementById("dataDir");
   if(d.data_dir && dd.textContent !== d.data_dir){
     dd.textContent = d.data_dir;
@@ -817,7 +818,7 @@ function render(){
   if(state.view === "archive"){
     document.getElementById("listView").style.display = "none";
     document.getElementById("archiveView").style.display = "block";
-    document.getElementById("viewTitle").textContent = "🗄 Arşiv";
+    document.getElementById("viewTitle").textContent = "🗄 Archive";
     document.getElementById("capBadge").style.display = "none";
     document.getElementById("statChips").style.display = "none";
     document.getElementById("progressWrap").style.display = "none";
@@ -833,8 +834,8 @@ function render(){
   document.getElementById("viewTitle").textContent = activeCol.name;
 
   const mine = items.filter(function(i){ return i.collection === active; });
-  // Seçim kümesini görünenlerle kesiştir: koleksiyon değişince, öğe silinince ya da
-  // uygulama yeniden başlayıp id'ler sıfırlanınca yanlış hedefe toplu işlem yapılmasın.
+  // Intersect the selection with what is visible, so a collection switch, a
+  // deletion or an id reset after a restart cannot bulk-act on the wrong rows.
   if(state.selected.size){
     const visible = new Set(mine.map(function(i){ return i.id; }));
     for(const id of Array.from(state.selected)) if(!visible.has(id)) state.selected.delete(id);
@@ -860,8 +861,8 @@ function render(){
   if(!pending.length){
     ep.style.display = "block";
     ep.textContent = (state.query || state.viewFilter !== "all")
-      ? "Bu filtre/aramayla eşleşen bekleyen öğe yok."
-      : "Bu koleksiyonda bekleyen bir şey yok. Bir şey kopyala (Ctrl+C) — anında burada belirecek.";
+      ? "No pending item matches this filter or search."
+      : "Nothing is pending in this collection. Copy something (Ctrl+C) — it shows up here instantly.";
   }else{
     ep.style.display = "none";
   }
@@ -870,7 +871,7 @@ function render(){
 
   const bb = document.getElementById("bulkbar");
   bb.classList.toggle("show", state.selecting && state.selected.size > 0);
-  document.getElementById("bulkCount").textContent = state.selected.size + " seçili";
+  document.getElementById("bulkCount").textContent = state.selected.size + " selected";
 }
 
 function archCard(e){
@@ -892,7 +893,7 @@ function archCard(e){
   const meta = document.createElement("div");
   meta.className = "meta";
   const info = document.createElement("span");
-  info.textContent = "🗄 " + fmtDT(e.archived_at) + " · " + (e.collection_name || "Genel");
+  info.textContent = "🗄 " + fmtDT(e.archived_at) + " · " + (e.collection_name || "General");
   meta.appendChild(info);
   if(isSafeLink){
     const hc = document.createElement("span");
@@ -906,11 +907,11 @@ function archCard(e){
   const actions = document.createElement("div");
   actions.className = "actions";
   const rs = document.createElement("button");
-  rs.className = "icobtn"; rs.title = "Aktif koleksiyona geri yükle"; rs.textContent = "↩";
+  rs.className = "icobtn"; rs.title = "Restore into the active collection"; rs.textContent = "↩";
   rs.addEventListener("click", function(){ post("/api/archive/restore", {aids:[e.aid]}); });
   actions.appendChild(rs);
   const del = document.createElement("button");
-  del.className = "icobtn danger"; del.title = "Arşivden kalıcı sil"; del.textContent = "✕";
+  del.className = "icobtn danger"; del.title = "Delete permanently from the archive"; del.textContent = "✕";
   del.addEventListener("click", function(){ post("/api/archive/delete", {aids:[e.aid]}); });
   actions.appendChild(del);
   li.appendChild(actions);
@@ -922,8 +923,8 @@ function renderArchive(){
   const area = document.getElementById("archiveArea");
   const note = document.getElementById("archNote");
   const d = state.data || {};
-  note.textContent = "Saklama kuralı: " + (RETENTION_LABEL[d.retention] || d.retention) +
-    " — süresi dolan arşiv kayıtları otomatik silinir. Ayarlar bölümünden değiştirebilirsin.";
+  note.textContent = "Retention rule: " + (RETENTION_LABEL[d.retention] || d.retention) +
+    " — expired archive entries are deleted automatically. You can change it under Settings.";
   if(!a){ area.innerHTML = ""; return; }
   let items = (a.items || []).slice().sort(function(x,y){
     return String(y.archived_at||"").localeCompare(String(x.archived_at||""));
@@ -949,7 +950,7 @@ function renderArchive(){
 
 function renderFromCache(){ render(); }
 
-/* ---------------- veri çekme ---------------- */
+/* ---------------- data fetch ---------------- */
 async function refresh(){
   let d, a = null;
   try{
@@ -964,7 +965,7 @@ async function refresh(){
     return;
   }
   document.body.classList.remove("offline");
-  // gün anahtarı da karşılaştırmaya dahil: gece yarısı geçince yeniden çizilir
+  // the day key is part of the comparison, so it redraws after midnight
   const s = JSON.stringify(d) + "|" + JSON.stringify(a) + "|" + dayKeyOf(new Date()) + "|" + state.view;
   if(s === state.last) return;
   state.last = s;
@@ -973,7 +974,7 @@ async function refresh(){
   render();
 }
 
-/* ---------------- olaylar ---------------- */
+/* ---------------- events ---------------- */
 document.getElementById("capSwitch").addEventListener("click", function(){
   const on = state.data ? !!state.data.capture_enabled : true;
   post("/api/settings", {capture_enabled: !on});
@@ -985,17 +986,17 @@ document.querySelectorAll(".fbtn").forEach(function(b){
 document.getElementById("domSave").addEventListener("click", function(){
   const doms = document.getElementById("domInput").value.split(",").map(function(s){ return s.trim(); }).filter(Boolean);
   post("/api/settings", {custom_domains: doms});
-  miniToast("Alan adları kaydedildi");
+  miniToast("Domains saved");
 });
 document.getElementById("filterAllBtn").addEventListener("click", function(){
   post("/api/settings", {filter_mode: "all"});
-  miniToast("Artık her şey kaydediliyor");
+  miniToast("Everything is being saved now");
 });
 
 document.getElementById("startupRow").addEventListener("click", async function(){
   const on = state.data ? !!state.data.startup_enabled : false;
   const r = await post("/api/settings", {startup_enabled: !on});
-  if(r && r.ok) miniToast(!on ? "Windows açılışında başlayacak" : "Açılışta başlatma kapatıldı");
+  if(r && r.ok) miniToast(!on ? "It will start with Windows" : "Start with Windows turned off");
 });
 document.getElementById("notifRow").addEventListener("click", function(){
   const on = state.data ? state.data.notifications_enabled !== false : true;
@@ -1004,7 +1005,7 @@ document.getElementById("notifRow").addEventListener("click", function(){
 
 document.getElementById("retention").addEventListener("change", function(e){
   post("/api/settings", {retention: e.target.value});
-  miniToast("Saklama süresi: " + (RETENTION_LABEL[e.target.value] || e.target.value));
+  miniToast("Retention: " + (RETENTION_LABEL[e.target.value] || e.target.value));
 });
 
 document.querySelectorAll(".vchip").forEach(function(b){
@@ -1041,11 +1042,11 @@ document.getElementById("search").addEventListener("input", function(e){
 (function(){
   const btn = document.getElementById("clearBtn");
   let armed = false, timer = null;
-  function disarm(){ armed = false; btn.classList.remove("armed"); btn.textContent = "Temizle"; }
+  function disarm(){ armed = false; btn.classList.remove("armed"); btn.textContent = "Clear"; }
   btn.addEventListener("click", function(){
-    if(state.view === "archive"){ miniToast("Arşivde tekil silme kullan (✕)", true); return; }
+    if(state.view === "archive"){ miniToast("In the archive, delete items one by one (✕)", true); return; }
     if(!armed){
-      armed = true; btn.classList.add("armed"); btn.textContent = "Emin misin?";
+      armed = true; btn.classList.add("armed"); btn.textContent = "Are you sure?";
       timer = setTimeout(disarm, ARM_MS);
       return;
     }
@@ -1064,26 +1065,26 @@ function visiblePending(){
 
 document.getElementById("copyListBtn").addEventListener("click", async function(){
   const items = visiblePending();
-  if(!items.length){ miniToast("Kopyalanacak bekleyen öğe yok", true); return; }
+  if(!items.length){ miniToast("No pending item to copy", true); return; }
   const text = items.map(function(i){ return i.text; }).join("\n");
-  if(await copyText(text)) miniToast(items.length + " öğe panoya kopyalandı");
+  if(await copyText(text)) miniToast(items.length + " item(s) copied to the clipboard");
 });
 
 document.getElementById("downloadBtn").addEventListener("click", function(){
   const d = state.data;
   if(!d) return;
-  const col = (d.collections.find(function(c){ return c.id === d.active_collection; }) || {name:"liste"}).name;
+  const col = (d.collections.find(function(c){ return c.id === d.active_collection; }) || {name:"list"}).name;
   const mine = (d.items||[]).filter(function(i){ return i.collection === d.active_collection; })
     .filter(matchesView).filter(matchesQuery);
   const pend = mine.filter(function(i){ return !i.checked; });
   const done = mine.filter(function(i){ return i.checked; });
-  const n = new Date();  // yerel saat — uygulamanın geri kalanıyla tutarlı olsun
-  const stamp = pad(n.getDate()) + "." + pad(n.getMonth()+1) + "." + n.getFullYear() +
+  const n = new Date();  // local time — consistent with the rest of the app
+  const stamp = n.getFullYear() + "-" + pad(n.getMonth()+1) + "-" + pad(n.getDate()) +
     " " + pad(n.getHours()) + ":" + pad(n.getMinutes());
   let out = "# Easy Copy Tracker — " + col + " — " + stamp + "\n\n";
-  out += "## Bekleyenler (" + pend.length + ")\n";
+  out += "## Pending (" + pend.length + ")\n";
   pend.forEach(function(i){ out += "- [ ] " + (i.title ? i.title + " — " : "") + i.text + "\n"; });
-  out += "\n## Tamamlananlar (" + done.length + ")\n";
+  out += "\n## Done (" + done.length + ")\n";
   done.forEach(function(i){ out += "- [x] " + (i.title ? i.title + " — " : "") + i.text + "\n"; });
   const blob = new Blob([out], {type:"text/plain;charset=utf-8"});
   const a = document.createElement("a");
@@ -1093,35 +1094,35 @@ document.getElementById("downloadBtn").addEventListener("click", function(){
   setTimeout(function(){ URL.revokeObjectURL(a.href); }, 3000);
 });
 
-/* seçim modu */
+/* selection mode */
 document.getElementById("selectBtn").addEventListener("click", function(){
   state.selecting = !state.selecting;
   if(!state.selecting) state.selected.clear();
-  this.textContent = state.selecting ? "☑ Seçim: açık" : "☑ Seç";
+  this.textContent = state.selecting ? "☑ Selecting" : "☑ Select";
   renderFromCache();
 });
 document.getElementById("bulkCancel").addEventListener("click", function(){
   state.selecting = false; state.selected.clear();
-  document.getElementById("selectBtn").textContent = "☑ Seç";
+  document.getElementById("selectBtn").textContent = "☑ Select";
   renderFromCache();
 });
 document.getElementById("bulkCopy").addEventListener("click", async function(){
   const d = state.data; if(!d) return;
   const items = (d.items||[]).filter(function(i){ return state.selected.has(i.id); });
   const text = items.map(function(i){ return i.text; }).join("\n");
-  if(text && await copyText(text)) miniToast(items.length + " öğe kopyalandı");
+  if(text && await copyText(text)) miniToast(items.length + " item(s) copied");
 });
 document.getElementById("bulkArchive").addEventListener("click", async function(){
   const ids = Array.from(state.selected);
   state.selected.clear();
   const r = await post("/api/archive", {ids:ids});
-  if(r && r.ok) miniToast(r.moved + " öğe arşivlendi");
+  if(r && r.ok) miniToast(r.moved + " item(s) archived");
 });
 document.getElementById("bulkDelete").addEventListener("click", async function(){
   const ids = Array.from(state.selected);
   state.selected.clear();
   const r = await post("/api/delete", {ids:ids});
-  if(r && r.ok) miniToast(r.removed + " öğe silindi");
+  if(r && r.ok) miniToast(r.removed + " item(s) deleted");
 });
 
 document.getElementById("archiveDoneBtn").addEventListener("click", async function(){
@@ -1129,14 +1130,14 @@ document.getElementById("archiveDoneBtn").addEventListener("click", async functi
   const ids = (d.items||[]).filter(function(i){
     return i.collection === d.active_collection && i.checked;
   }).map(function(i){ return i.id; });
-  if(!ids.length){ miniToast("Arşivlenecek tamamlanmış öğe yok", true); return; }
+  if(!ids.length){ miniToast("No completed item to archive", true); return; }
   const r = await post("/api/archive", {ids:ids});
-  if(r && r.ok) miniToast(r.moved + " öğe arşivlendi");
+  if(r && r.ok) miniToast(r.moved + " item(s) archived");
 });
 
 document.getElementById("recRestore").addEventListener("click", async function(){
   const r = await post("/api/recovery", {action:"restore"});
-  if(r && r.ok) miniToast(r.restored + " öğe geri yüklendi");
+  if(r && r.ok) miniToast(r.restored + " item(s) restored");
 });
 document.getElementById("recDiscard").addEventListener("click", function(){
   post("/api/recovery", {action:"discard"});

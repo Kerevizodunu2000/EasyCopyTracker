@@ -12,4 +12,6 @@ Thanks for your interest! A few ground rules:
 - **Never commit personal data:** `settings.json`, `archive.json`, logs and
   session snapshots are gitignored for a reason — they contain clipboard
   contents.
-- UI language is Turkish; an i18n/English localization PR is very welcome.
+- **Language:** the code, comments, UI strings and documentation are all in
+  English. Please keep new contributions that way; a proper i18n layer would be
+  a welcome PR of its own.

@@ -1,23 +1,24 @@
-# Lint yapılandırması — kural seti burada sabit tutulur ki yerelde ve CI'da
-# aynı sonucu versin (ruff'ın varsayılanları sürümle birlikte değişebiliyor).
+# Lint configuration — the rule set is pinned here so local runs and CI agree
+# (ruff's defaults can change between releases).
 
 line-length = 100
 target-version = "py310"
 
 [lint]
 select = [
-  "E",   # pycodestyle hataları
-  "W",   # pycodestyle uyarıları
-  "F",   # pyflakes — kullanılmayan içe aktarma/değişken, tanımsız ad
-  "I",   # içe aktarma sıralaması
-  "B",   # bugbear — yaygın tuzaklar
-  "UP",  # eski Python kalıpları
+  "E",   # pycodestyle errors
+  "W",   # pycodestyle warnings
+  "F",   # pyflakes — unused imports/variables, undefined names
+  "I",   # import sorting
+  "B",   # bugbear — common traps
+  "UP",  # outdated Python idioms
 ]
 ignore = [
-  # Pano/Win32 katmanında bilinçli olarak yutulan hatalar var: bildirim
-  # gösterilemedi, gölge kopya yazılamadı gibi durumlar uygulamayı durdurmamalı.
+  # The clipboard/Win32 layer swallows some errors on purpose: a notification
+  # that cannot be shown or a shadow copy that cannot be written must not stop
+  # the application.
   "B904",
 ]
 
 [lint.per-file-ignores]
-"easycopytracker.py" = ["E402"]  # ctypes tanımları bölüm bölüm, içe aktarmalar arada
+"easycopytracker.py" = ["E402"]  # ctypes declarations come in blocks, imports in between
