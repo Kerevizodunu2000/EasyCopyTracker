@@ -1,5 +1,4 @@
-﻿# -*- coding: utf-8 -*-
-"""
+﻿"""
 Easy Copy Tracker — Pano gelen kutusu / link triage aracı.
 
 Mimari:
@@ -132,7 +131,7 @@ def _write_json(path, obj):
 
 def _read_json(path):
     try:
-        with open(path, "r", encoding="utf-8-sig") as f:
+        with open(path, encoding="utf-8-sig") as f:
             return json.load(f)
     except Exception:
         return None
@@ -920,6 +919,59 @@ def _round_corners(hwnd):
         pass
 
 
+def _show_toast(tk, title, msg):
+    """Tek bir bildirim penceresi açar ve kapanana kadar bekler.
+
+    Ayrı bir fonksiyon olması önemli: iç içe tanımlanan geri çağrılar `root`'u
+    döngü değişkeni olarak değil, kendi yerel değişkeni olarak yakalar.
+    """
+    root = tk.Tk()
+    root.withdraw()
+    root.overrideredirect(True)
+    root.attributes("-topmost", True)
+    root.attributes("-alpha", 0.0)
+    _, _, right, bottom = _work_area()
+    root.geometry(f"{TOAST_W}x{TOAST_H}+{right - TOAST_W - 16}+{bottom - TOAST_H - 16}")
+    root.configure(bg="#1a0f15")
+    tk.Frame(root, bg="#ff2d6f", width=4).pack(side="left", fill="y")  # marka rengi
+    box = tk.Frame(root, bg="#1a0f15")
+    box.pack(side="left", fill="both", expand=True, padx=14, pady=10)
+    tk.Label(box, text=title, bg="#1a0f15", fg="#ffffff",
+             font=("Segoe UI", 10, "bold"), anchor="w", justify="left",
+             wraplength=TOAST_W - 50).pack(fill="x")
+    tk.Label(box, text=msg, bg="#1a0f15", fg="#c6cbd4",
+             font=("Segoe UI", 9), anchor="w", justify="left",
+             wraplength=TOAST_W - 50).pack(fill="x", pady=(3, 0))
+
+    def open_list(_e=None):
+        try:
+            webbrowser.open(URL)
+        finally:
+            root.destroy()
+
+    root.bind_all("<Button-1>", open_list)
+    root.deiconify()
+    root.update_idletasks()
+    _round_corners(user32.GetParent(root.winfo_id()) or root.winfo_id())
+
+    def fade_in(step=0):
+        if step > 10:
+            return
+        root.attributes("-alpha", step / 10)
+        root.after(15, lambda: fade_in(step + 1))
+
+    def fade_out(step=10):
+        if step < 0:
+            root.destroy()
+            return
+        root.attributes("-alpha", step / 10)
+        root.after(20, lambda: fade_out(step - 1))
+
+    fade_in()
+    root.after(TOAST_SHOW_MS, fade_out)
+    root.mainloop()
+
+
 def toast_thread():
     try:
         import tkinter as tk
@@ -931,52 +983,7 @@ def toast_thread():
         if time.time() - ts > TOAST_MAX_AGE:
             continue
         try:
-            root = tk.Tk()
-            root.withdraw()
-            root.overrideredirect(True)
-            root.attributes("-topmost", True)
-            root.attributes("-alpha", 0.0)
-            left, top, right, bottom = _work_area()
-            root.geometry(f"{TOAST_W}x{TOAST_H}+{right - TOAST_W - 16}+{bottom - TOAST_H - 16}")
-            root.configure(bg="#1a0f15")
-            tk.Frame(root, bg="#ff2d6f", width=4).pack(side="left", fill="y")  # marka rengi
-            box = tk.Frame(root, bg="#1a0f15")
-            box.pack(side="left", fill="both", expand=True, padx=14, pady=10)
-            tk.Label(box, text=title, bg="#1a0f15", fg="#ffffff",
-                     font=("Segoe UI", 10, "bold"), anchor="w", justify="left",
-                     wraplength=TOAST_W - 50).pack(fill="x")
-            tk.Label(box, text=msg, bg="#1a0f15", fg="#c6cbd4",
-                     font=("Segoe UI", 9), anchor="w", justify="left",
-                     wraplength=TOAST_W - 50).pack(fill="x", pady=(3, 0))
-
-            def open_list(_e=None):
-                try:
-                    webbrowser.open(URL)
-                finally:
-                    root.destroy()
-
-            root.bind_all("<Button-1>", open_list)
-            root.deiconify()
-            root.update_idletasks()
-            hwnd = user32.GetParent(root.winfo_id()) or root.winfo_id()
-            _round_corners(hwnd)
-
-            def fade_in(step=0):
-                if step > 10:
-                    return
-                root.attributes("-alpha", step / 10)
-                root.after(15, lambda: fade_in(step + 1))
-
-            def fade_out(step=10):
-                if step < 0:
-                    root.destroy()
-                    return
-                root.attributes("-alpha", step / 10)
-                root.after(20, lambda: fade_out(step - 1))
-
-            fade_in()
-            root.after(TOAST_SHOW_MS, fade_out)
-            root.mainloop()
+            _show_toast(tk, title, msg)
         except Exception as e:
             log(f"Bildirim penceresi hatası: {e}")
 
@@ -1207,7 +1214,8 @@ def clipboard_worker():
             if status == "ok":
                 if not text.strip():
                     continue
-                if _ignore_text is not None and text == _ignore_text and time.time() < _ignore_until:
+                if (_ignore_text is not None and text == _ignore_text
+                        and time.time() < _ignore_until):
                     continue  # arayüzün "Kopyala" düğmesinden gelen kendi kopyamız
                 kind, item = add_item(text)
                 if kind in ("skip", "filtered"):
@@ -1221,7 +1229,8 @@ def clipboard_worker():
                 where = f" → {col}" if col != "Genel" else ""
                 if kind == "dup":
                     log(f"#{item['id']} tekrar kopyalandı (×{item['copies']}).")
-                    notify("♻️ Zaten listede", f"Tekrar kopyalandı (×{item['copies']}): {short(text, 80)}")
+                    notify("♻️ Zaten listede",
+                           f"Tekrar kopyalandı (×{item['copies']}): {short(text, 80)}")
                 elif item["is_link"]:
                     log(f"#{item['id']} link kaydedildi ({col}, {_host_of(item['url'])})")
                     notify("🔗 Web sitesi linki kopyalandı",
@@ -1284,7 +1293,8 @@ def _tray_menu(hwnd):
     if not menu:
         return
     try:
-        toggle_text = "⏸ Yakalamayı Durdur" if _settings["capture_enabled"] else "▶ Yakalamayı Başlat"
+        toggle_text = ("⏸ Yakalamayı Durdur" if _settings["capture_enabled"]
+                       else "▶ Yakalamayı Başlat")
         user32.AppendMenuW(menu, MF_STRING, ID_TRAY_OPEN, "📋 Listeyi Aç")
         user32.AppendMenuW(menu, MF_STRING, ID_TRAY_TOGGLE, toggle_text)
         user32.AppendMenuW(menu, MF_SEPARATOR, 0, None)
@@ -1347,8 +1357,10 @@ def run_listener():
     if not user32.AddClipboardFormatListener(_hwnd):
         raise ctypes.WinError(ctypes.get_last_error())
     # Pencere ikonu: Alt+Tab ve görev yöneticisinde uygulama simgesi görünsün
-    user32.SendMessageW(_hwnd, WM_SETICON, ICON_SMALL, _app_icon(user32.GetSystemMetrics(SM_CXSMICON)))
-    user32.SendMessageW(_hwnd, WM_SETICON, ICON_BIG, _app_icon(user32.GetSystemMetrics(SM_CXICON)))
+    small = _app_icon(user32.GetSystemMetrics(SM_CXSMICON))
+    big = _app_icon(user32.GetSystemMetrics(SM_CXICON))
+    user32.SendMessageW(_hwnd, WM_SETICON, ICON_SMALL, small)
+    user32.SendMessageW(_hwnd, WM_SETICON, ICON_BIG, big)
     _tray_add(_hwnd)
     if not user32.RegisterHotKey(_hwnd, HK_TOGGLE, MOD_CONTROL | MOD_ALT | MOD_NOREPEAT, 0x4B):
         log("Ctrl+Alt+K kısayolu alınamadı (başka uygulama kullanıyor olabilir).")
@@ -1469,7 +1481,8 @@ def api_settings():
         doms = body["custom_domains"]
         if not isinstance(doms, list):
             return jsonify({"ok": False, "error": "geçersiz alan adı listesi"}), 400
-        updates["custom_domains"] = [_norm_domain(str(s))[:100] for s in doms if str(s).strip()][:50]
+        updates["custom_domains"] = [
+            _norm_domain(str(s))[:100] for s in doms if str(s).strip()][:50]
         changed.append("özel alan adları")
     if "retention" in body:
         if body["retention"] not in RETENTIONS:

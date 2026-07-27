@@ -23,13 +23,13 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install ruff
+          pip install "ruff==0.15.9"   # kural seti ruff.toml'da sabit
 
       - name: Byte-compile
         run: python -m compileall -q easycopytracker.py
 
       - name: Lint
-        run: ruff check easycopytracker.py
+        run: ruff check .
 
       - name: Import smoke test
         run: python -c "import easycopytracker; print('import ok')"
