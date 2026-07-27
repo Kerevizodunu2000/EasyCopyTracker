@@ -66,6 +66,7 @@ HOST = "127.0.0.1"
 PORT = 8765
 URL = f"http://localhost:{PORT}"
 APP_NAME = "Easy Copy Tracker"
+VERSION = "1.1.0"
 DEDUP_WINDOW = 1.5   # s — collapses repeated clipboard events for the same content
 MAX_TEXT = 10000     # maximum number of characters stored per item
 MAX_ITEMS = 2000     # max items in the active list (oldest unpinned one is dropped)
@@ -542,7 +543,7 @@ TITLE_MAX_BYTES = 131072
 TITLE_SOCKET_TIMEOUT = 6      # s per socket operation
 TITLE_TOTAL_TIMEOUT = 15      # s wall clock for the whole fetch, redirects included
 TITLE_MAX_REDIRECTS = 3
-TITLE_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) EasyCopyTracker/1.0"
+TITLE_UA = f"Mozilla/5.0 (Windows NT 10.0; Win64; x64) EasyCopyTracker/{VERSION}"
 
 
 def _public_address(host):
@@ -2058,7 +2059,8 @@ def main():
     threading.Thread(target=toast_thread, daemon=True).start()
     threading.Thread(target=maintenance_thread, daemon=True).start()
     threading.Thread(target=backup_thread, daemon=True).start()
-    log(f"Easy Copy Tracker v1.0 started. Web UI: {URL}  (active list in RAM, archive on disk)")
+    log(f"Easy Copy Tracker v{VERSION} started. Web UI: {URL}  "
+        f"(active list in RAM, archive on disk)")
     log(f"Data folder: {DATA_DIR}")
     if not HAS_QR:
         log("Note: the 'qrcode' package is missing — the QR feature is off (pip install qrcode).")
