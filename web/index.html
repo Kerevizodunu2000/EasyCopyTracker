@@ -90,7 +90,17 @@ ul.plain{list-style:none;display:flex;flex-direction:column;gap:2px}
 .shortcuts{font-size:10.5px;color:var(--muted);line-height:1.8;padding:0 6px}
 .shortcuts b{color:var(--text);font-weight:600;background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:0 5px}
 
-.sideinfo{margin-top:auto;font-size:11px;color:var(--muted);padding:0 6px;line-height:1.7}
+.ghbox{margin-top:auto;display:flex;align-items:center;gap:10px;text-decoration:none;
+  background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:11px 13px;
+  color:var(--muted);transition:.15s}
+.ghbox:hover{border-color:var(--accent);color:var(--text)}
+.ghbox svg{flex:none}
+.ghtext{display:flex;flex-direction:column;line-height:1.35;min-width:0}
+.ghtext b{font-size:12.5px;font-weight:600;color:var(--text)}
+.ghtext small{font-size:10.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gharrow{margin-left:auto;font-size:13px;opacity:.6}
+.ghbox:hover .gharrow{opacity:1}
+.sideinfo{margin-top:14px;font-size:11px;color:var(--muted);padding:0 6px;line-height:1.7}
 .sideinfo code{color:var(--muted)}
 
 /* ---------------- içerik ---------------- */
@@ -112,6 +122,12 @@ body.paused #pausedBanner{display:block}
 #emptyDomainsBanner{display:none;background:var(--warn-bg);border:1px solid var(--warn-line);color:var(--warn-text);border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:13.5px;line-height:1.6}
 #emptyDomainsBanner code{background:rgba(127,127,127,.22);border-radius:4px;padding:1px 5px}
 body.nodomains #emptyDomainsBanner{display:block}
+#filterBanner{display:none;background:var(--info-bg);border:1px solid var(--info-line);color:var(--info-text);
+  border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:13.5px;align-items:center;gap:10px;flex-wrap:wrap}
+body.filtered #filterBanner{display:flex}
+#filterBanner button{margin-left:auto;background:var(--panel);border:1px solid var(--line);color:var(--text);
+  border-radius:8px;padding:5px 12px;font-size:12.5px;cursor:pointer}
+#filterBanner button:hover{border-color:var(--accent)}
 
 .stats{display:flex;gap:8px;margin-left:auto;flex-wrap:wrap}
 .chip{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:4px 12px;font-size:12.5px;color:var(--muted)}
@@ -288,6 +304,24 @@ body.selecting .actions{display:none}
       </div>
     </nav>
 
+    <a class="ghbox" href="https://github.com/Kerevizodunu2000/EasyCopyTracker"
+       target="_blank" rel="noopener noreferrer">
+      <svg viewBox="0 0 16 16" width="19" height="19" aria-hidden="true">
+        <path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38
+        0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01
+        1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95
+        0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09
+        2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87
+        3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016
+        8c0-4.42-3.58-8-8-8z"/>
+      </svg>
+      <span class="ghtext">
+        <b>Kaynak kodu · GitHub</b>
+        <small>Kerevizodunu2000/EasyCopyTracker</small>
+      </span>
+      <span class="gharrow">↗</span>
+    </a>
+
     <div class="sideinfo">
       <div id="started"></div>
       <div>Aktif liste RAM'de · arşiv <code>archive.json</code></div>
@@ -310,6 +344,8 @@ body.selecting .actions{display:none}
 
     <div id="pausedBanner">⏸ Yakalama kapalı — kopyaladıkların şu an kaydedilmiyor. Şalterle ya da Ctrl+Alt+K ile aç.</div>
     <div id="emptyDomainsBanner">🎯 Filtre <b>“Özel alan adları”</b> seçili ama liste boş — bu yüzden <b>hiçbir şey kaydedilmiyor</b>. Soldan alan adı ekle (ör. <code>instagram.com</code>) ya da filtreyi <b>Tümü</b> yap.</div>
+    <div id="filterBanner">🔎 Yakalama filtresi <b id="filterName"></b> — bu filtreye uymayan kopyalar <b>kaydedilmiyor</b>.
+      <button id="filterAllBtn">Tümünü yakala</button></div>
     <div id="recoveryBanner">💾 <span id="recText"></span>
       <button id="recRestore">Geri Yükle</button>
       <button id="recDiscard">Yoksay</button>
@@ -413,6 +449,7 @@ const FDESC = {
   custom: "Sadece aşağıdaki alan adlarının linkleri kaydediliyor.",
   custom_empty: "⚠️ Liste boş — hiçbir şey kaydedilmiyor. Alan adı ekle."
 };
+const FNAME = {links:"🔗 Sadece linkler", instagram:"📷 Sadece Instagram", custom:"🎯 Özel alan adları"};
 const RETENTION_LABEL = {"1h":"1 saat","1d":"1 gün","eod":"gün sonu","1m":"1 ay","forever":"sonsuz"};
 
 function fmtTime(iso){ return iso ? iso.slice(11,16) : ""; }
@@ -679,6 +716,10 @@ function render(){
   // "Özel alan adları" seçili ama liste boşsa hiçbir şey yakalanmaz — sessiz kalma
   const noDomains = d.filter_mode === "custom" && (!d.custom_domains || !d.custom_domains.length);
   document.body.classList.toggle("nodomains", noDomains && d.capture_enabled);
+  // Filtre "Tümü" değilse bunu sürekli görünür kıl — yoksa uygulama bozuk sanılıyor
+  const filtering = d.filter_mode !== "all" && d.capture_enabled && !noDomains;
+  document.body.classList.toggle("filtered", filtering);
+  if(filtering) document.getElementById("filterName").textContent = FNAME[d.filter_mode] || d.filter_mode;
   document.body.classList.toggle("selecting", state.selecting);
   const sw = document.getElementById("capSwitch");
   sw.classList.toggle("on", !!d.capture_enabled);
@@ -946,6 +987,11 @@ document.getElementById("domSave").addEventListener("click", function(){
   post("/api/settings", {custom_domains: doms});
   miniToast("Alan adları kaydedildi");
 });
+document.getElementById("filterAllBtn").addEventListener("click", function(){
+  post("/api/settings", {filter_mode: "all"});
+  miniToast("Artık her şey kaydediliyor");
+});
+
 document.getElementById("startupRow").addEventListener("click", async function(){
   const on = state.data ? !!state.data.startup_enabled : false;
   const r = await post("/api/settings", {startup_enabled: !on});

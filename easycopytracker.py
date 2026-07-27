@@ -75,6 +75,7 @@ RETENTIONS = ("1h", "1d", "eod", "1m", "forever")
 RETENTION_SECS = {"1h": 3600, "1d": 86400, "1m": 30 * 86400}
 
 # pythonw ile (konsolsuz) çalışırken stdout/stderr None olur → log dosyasına yönlendir
+_STDOUT_IS_LOG = sys.stdout is None
 if sys.stdout is None:
     sys.stdout = open(LOG_FILE, "a", encoding="utf-8", buffering=1)
 if sys.stderr is None:
@@ -102,10 +103,11 @@ except ImportError:
 
 def log(msg):
     line = f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {msg}"
-    try:
-        print(line)
-    except Exception:
-        pass
+    if not _STDOUT_IS_LOG:  # pythonw altında stdout zaten log dosyası — iki kez yazma
+        try:
+            print(line)
+        except Exception:
+            pass
     try:
         with open(LOG_FILE, "a", encoding="utf-8") as f:
             f.write(line + "\n")
@@ -919,22 +921,31 @@ def _round_corners(hwnd):
         pass
 
 
-def _show_toast(tk, title, msg):
-    """Tek bir bildirim penceresi açar ve kapanana kadar bekler.
+_active_toasts = []
 
-    Ayrı bir fonksiyon olması önemli: iç içe tanımlanan geri çağrılar `root`'u
-    döngü değişkeni olarak değil, kendi yerel değişkeni olarak yakalar.
+
+def _show_toast(tk, root, title, msg):
+    """Kalıcı kök pencerenin altında tek bir bildirim (Toplevel) gösterir.
+
+    Her bildirim için ayrı bir Tk() kökü açmak, iş parçacığı içinde tekrar
+    tekrar yapıldığında süreci sertçe düşürebiliyordu; tek kök + Toplevel
+    kullanımı Tk'nin desteklediği yol.
     """
-    root = tk.Tk()
-    root.withdraw()
-    root.overrideredirect(True)
-    root.attributes("-topmost", True)
-    root.attributes("-alpha", 0.0)
+    win = tk.Toplevel(root)
+    win.withdraw()
+    win.overrideredirect(True)
+    win.attributes("-topmost", True)
+    win.attributes("-alpha", 0.0)
+
+    slot = len(_active_toasts)            # üst üste binmesinler
+    _active_toasts.append(win)
     _, _, right, bottom = _work_area()
-    root.geometry(f"{TOAST_W}x{TOAST_H}+{right - TOAST_W - 16}+{bottom - TOAST_H - 16}")
-    root.configure(bg="#1a0f15")
-    tk.Frame(root, bg="#ff2d6f", width=4).pack(side="left", fill="y")  # marka rengi
-    box = tk.Frame(root, bg="#1a0f15")
+    y = bottom - TOAST_H - 16 - slot * (TOAST_H + 10)
+    win.geometry(f"{TOAST_W}x{TOAST_H}+{right - TOAST_W - 16}+{y}")
+
+    win.configure(bg="#1a0f15")
+    tk.Frame(win, bg="#ff2d6f", width=4).pack(side="left", fill="y")  # marka rengi
+    box = tk.Frame(win, bg="#1a0f15")
     box.pack(side="left", fill="both", expand=True, padx=14, pady=10)
     tk.Label(box, text=title, bg="#1a0f15", fg="#ffffff",
              font=("Segoe UI", 10, "bold"), anchor="w", justify="left",
@@ -943,49 +954,79 @@ def _show_toast(tk, title, msg):
              font=("Segoe UI", 9), anchor="w", justify="left",
              wraplength=TOAST_W - 50).pack(fill="x", pady=(3, 0))
 
+    closed = []
+
+    def close():
+        if closed:
+            return
+        closed.append(True)
+        if win in _active_toasts:
+            _active_toasts.remove(win)
+        try:
+            win.destroy()
+        except Exception:
+            pass
+
     def open_list(_e=None):
         try:
             webbrowser.open(URL)
         finally:
-            root.destroy()
+            close()
 
-    root.bind_all("<Button-1>", open_list)
-    root.deiconify()
-    root.update_idletasks()
-    _round_corners(user32.GetParent(root.winfo_id()) or root.winfo_id())
+    win.bind("<Button-1>", open_list)
+    for child in (box,) + tuple(box.winfo_children()):
+        child.bind("<Button-1>", open_list)
+    win.deiconify()
+    win.update_idletasks()
+    _round_corners(user32.GetParent(win.winfo_id()) or win.winfo_id())
 
-    def fade_in(step=0):
-        if step > 10:
+    def fade(step, delta, on_end):
+        if closed:
             return
-        root.attributes("-alpha", step / 10)
-        root.after(15, lambda: fade_in(step + 1))
-
-    def fade_out(step=10):
-        if step < 0:
-            root.destroy()
+        try:
+            win.attributes("-alpha", max(0.0, min(1.0, step / 10)))
+        except Exception:
+            return close()
+        nxt = step + delta
+        if (delta > 0 and nxt > 10) or (delta < 0 and nxt < 0):
+            on_end()
             return
-        root.attributes("-alpha", step / 10)
-        root.after(20, lambda: fade_out(step - 1))
+        win.after(18, lambda: fade(nxt, delta, on_end))
 
-    fade_in()
-    root.after(TOAST_SHOW_MS, fade_out)
-    root.mainloop()
+    fade(0, 1, lambda: win.after(TOAST_SHOW_MS, lambda: fade(10, -1, close)))
 
 
 def toast_thread():
+    """Bildirimleri tek bir Tk kökü ve tek bir mesaj döngüsü üzerinden gösterir."""
     try:
         import tkinter as tk
     except Exception as e:
         log(f"tkinter bulunamadı, bildirimler devre dışı: {e}")
         return
-    while True:
-        title, msg, ts = _toasts.get()
-        if time.time() - ts > TOAST_MAX_AGE:
-            continue
+    try:
+        root = tk.Tk()
+        root.withdraw()
+    except Exception as e:
+        log(f"Bildirim penceresi kurulamadı, bildirimler devre dışı: {e}")
+        return
+
+    def pump():
         try:
-            _show_toast(tk, title, msg)
+            while True:
+                title, msg, ts = _toasts.get_nowait()
+                if time.time() - ts <= TOAST_MAX_AGE:
+                    _show_toast(tk, root, title, msg)
+        except queue.Empty:
+            pass
         except Exception as e:
-            log(f"Bildirim penceresi hatası: {e}")
+            log(f"Bildirim gösterilemedi: {e}")
+        root.after(150, pump)
+
+    root.after(150, pump)
+    try:
+        root.mainloop()
+    except Exception as e:
+        log(f"Bildirim döngüsü durdu: {e}")
 
 
 # ------------------------------------------------- Win32 (ctypes) tanımları
@@ -1182,25 +1223,31 @@ _last_nontext = 0.0
 _last_blind_warn = 0.0
 
 
-def warn_if_filter_blind():
-    """'Özel alan adları' seçili ama liste boşsa hiçbir şey yakalanamaz.
+FILTER_LABEL = {"links": "Sadece linkler", "instagram": "Sadece Instagram",
+                "custom": "Özel alan adları"}
 
-    Bu sessiz bir çıkmazdır: arayüz 'Yakalama açık' der ama tek bir kopya bile
-    kaydedilmez. Kullanıcıyı en fazla dakikada bir uyar.
+
+def warn_filtered():
+    """Bir kopya filtreye takıldığında kullanıcıya sebebini söyler.
+
+    Filtre açıkken uygulama "hiç çalışmıyor" gibi görünüyordu: kopyalıyorsun,
+    hiçbir şey olmuyor, ekranda da bir açıklama yok. En fazla 30 sn'de bir
+    hatırlatma göster — sürekli kopyalarken rahatsız etmesin.
     """
     global _last_blind_warn
-    with _lock:
-        blind = (_settings["filter_mode"] == "custom"
-                 and not [d for d in _settings["custom_domains"] if d.strip()])
-    if not blind:
-        return
     now = time.time()
-    if now - _last_blind_warn < 60:
+    if now - _last_blind_warn < 30:
         return
     _last_blind_warn = now
-    log("UYARI: filtre 'özel alan adları' ama liste boş — hiçbir şey kaydedilmiyor.")
-    notify("⚠️ Hiçbir şey kaydedilmiyor",
-           "Filtre 'Özel alan adları' ama liste boş. Alan adı ekle ya da 'Tümü' seç.")
+    with _lock:
+        mode = _settings["filter_mode"]
+        domains = [d for d in _settings["custom_domains"] if d.strip()]
+    if mode == "custom" and not domains:
+        notify("⚠️ Hiçbir şey kaydedilmiyor",
+               "Filtre 'Özel alan adları' ama liste boş. Alan adı ekle ya da 'Tümü' seç.")
+        return
+    notify(f"🚫 Filtre nedeniyle kaydedilmedi — {FILTER_LABEL.get(mode, mode)}",
+           "Her şeyin kaydedilmesi için soldaki filtreyi 'Tümü' yap.")
 
 
 def clipboard_worker():
@@ -1221,7 +1268,7 @@ def clipboard_worker():
                 if kind in ("skip", "filtered"):
                     if kind == "filtered":
                         log(f"Filtre nedeniyle kaydedilmedi ({len(text)} karakter).")
-                        warn_if_filter_blind()
+                        warn_filtered()
                     continue
                 # Log'a pano İÇERİĞİ yazılmaz (log dosyası paylaşılabilir/yedeklenebilir);
                 # sadece sayısal üstveri tutulur. İçerik yalnızca ekrandaki bildirimde.
